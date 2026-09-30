@@ -31,6 +31,9 @@ class ASREngine:
             config.model_size,
             device=device,
             compute_type=compute_type,
+            # The model is public; don't send a stored (possibly expired)
+            # Hugging Face token, which makes the download fail with 401.
+            use_auth_token=False,
         )
 
     def transcribe(self, audio: AudioData) -> ASRResult:
