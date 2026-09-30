@@ -219,4 +219,4 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 
 ## License
 
-<!-- TODO(authors): choose a license and add a LICENSE file before release (required by the HRI Code track). -->
+RAWR is released under the [MIT License](LICENSE). Third-party components (Silero VAD, faster-whisper, FastAPI, NAOqi) are used under their own licenses.
