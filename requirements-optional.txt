@@ -1,0 +1,13 @@
+# Optional features (install only what you use)
+
+# Furhat backend (robot.backend: furhat)
+furhat-remote-api>=1.0.2
+
+# Reachy Mini backend (robot.backend: reachy_mini); [mujoco] adds the simulator
+# On Linux, reachy-mini needs PyGObject system libraries; on Windows it uses a bundled GStreamer
+reachy-mini[mujoco]>=1.11
+# Offline speech for Reachy Mini: SAPI via comtypes on Windows; espeak-ng (system package) on Linux
+comtypes>=1.4; sys_platform == "win32"
+
+# Fidelity detector (fidelity.detector_enabled); torch is already required
+transformers>=4.50,<6

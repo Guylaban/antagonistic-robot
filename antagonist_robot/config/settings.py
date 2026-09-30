@@ -50,6 +50,49 @@ class NAOConfig:
 
 
 @dataclass
+class RobotConfig:
+    """Which robot backend to use (robots/)."""
+    backend: str = "nao"                # nao | furhat | reachy_mini | text
+    expressions: bool = False           # condition-specific non-verbal cues (Furhat, Reachy Mini)
+
+
+@dataclass
+class FurhatConfig:
+    """Furhat Remote API (robot or virtual Furhat, port 54321)."""
+    host: str = "localhost"
+    voice: Optional[str] = None
+
+
+@dataclass
+class ReachyMiniConfig:
+    """Reachy Mini SDK daemon (robot or `reachy-mini-daemon --sim`)."""
+    host: str = "localhost"
+    port: int = 8000
+    connection_mode: str = "auto"       # auto | localhost_only | network
+    tts_rate: Optional[int] = 175       # words per minute for the offline TTS
+    tts_voice: Optional[str] = None     # substring of an installed voice name
+
+
+@dataclass
+class FidelityConfig:
+    """Fidelity monitor: does a reply actually enact the requested antagonism?
+
+    detector: offline DistilBERT softening detector (tools/train_fidelity_detector.py).
+    judge: LLM judge with the RAGE benchmark rubric (category + intensity, 0-10).
+    """
+    detector_enabled: bool = False
+    detector_path: str = "models/fidelity_detector"
+    detector_device: str = "auto"       # auto | cpu | cuda
+    judge_enabled: bool = False
+    judge_base_url: str = "https://api.openai.com/v1"
+    judge_model: str = "gpt-4o"
+    judge_api_key_env: str = "OPENAI_API_KEY"
+    judge_timeout_s: float = 20.0
+    block_auto_send_below: Optional[int] = 4   # judge fidelity below this blocks auto-send; null = advisory only
+    api_key: str = field(default="", repr=False)
+
+
+@dataclass
 class AvctConfig:
     """AVCT parameter configuration via Polar Scale and Categories."""
     default_polar_level: int = 2
@@ -63,6 +106,7 @@ class OperatorConfig:
     review_mode: str = "timed"          # "timed" or "manual"
     hold_seconds: float = 3.0           # review window before automatic release
     block_auto_send_at: str = "Orange"  # responses rated at or above this need an explicit Send
+    model_can_end_session: bool = False  # if false, the model's [END] token only suggests ending to the operator
 
 
 @dataclass
@@ -104,6 +148,10 @@ class AppConfig:
     monitor: MonitorConfig
     logging: LoggingConfig
     server: ServerConfig
+    robot: RobotConfig = field(default_factory=RobotConfig)
+    furhat: FurhatConfig = field(default_factory=FurhatConfig)
+    reachy_mini: ReachyMiniConfig = field(default_factory=ReachyMiniConfig)
+    fidelity: FidelityConfig = field(default_factory=FidelityConfig)
     project_root: Path = field(default_factory=lambda: Path.cwd())
 
 
@@ -139,6 +187,23 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     monitor = _build_dataclass(MonitorConfig, raw.get("monitor", {}))
     logging_cfg = _build_dataclass(LoggingConfig, raw.get("logging", {}))
     server = _build_dataclass(ServerConfig, raw.get("server", {}))
+    robot = _build_dataclass(RobotConfig, raw.get("robot", {}))
+    furhat = _build_dataclass(FurhatConfig, raw.get("furhat", {}))
+    reachy = _build_dataclass(ReachyMiniConfig, raw.get("reachy_mini", {}))
+    fidelity = _build_dataclass(FidelityConfig, raw.get("fidelity", {}))
+
+    from antagonist_robot.robots import BACKENDS
+    if robot.backend not in BACKENDS:
+        raise ValueError(f"robot.backend must be one of {BACKENDS}, got {robot.backend!r}")
+    if fidelity.judge_enabled:
+        fidelity.api_key = os.environ.get(fidelity.judge_api_key_env, "")
+        if not fidelity.api_key:
+            raise ValueError(
+                f"fidelity.judge_enabled is true but '{fidelity.judge_api_key_env}' is not set. "
+                f"Set it, or set fidelity.judge_enabled to false."
+            )
+    if not Path(fidelity.detector_path).is_absolute():
+        fidelity.detector_path = str(project_root / fidelity.detector_path)
 
     # Resolve LLM API key from environment
     llm.api_key = os.environ.get(llm.api_key_env, "")
@@ -173,6 +238,10 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
         monitor=monitor,
         logging=logging_cfg,
         server=server,
+        robot=robot,
+        furhat=furhat,
+        reachy_mini=reachy,
+        fidelity=fidelity,
         project_root=project_root,
     )
 

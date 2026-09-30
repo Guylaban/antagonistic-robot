@@ -20,11 +20,27 @@ llm:
   api_key_env: "GROK_API_KEY"
   stream: false
 
+# Which robot speaks the released replies (antagonist_robot/robots/).
+robot:
+  backend: "nao"        # nao | furhat | reachy_mini | text (prints replies; no robot)
+  expressions: false    # condition-specific non-verbal cues on Furhat / Reachy Mini (off: verbal-only manipulation)
+
 nao:
   ip: "nao.local"      # mDNS name; resolved on every connection (the cable IP changes per session)
   port: 9600
   naoqi_port: 9559
   password: "nao"
+
+furhat:                 # needs the Remote API skill running on the robot or virtual Furhat (port 54321)
+  host: "localhost"
+  voice: null           # e.g. "Matthew"; null keeps the robot's current voice
+
+reachy_mini:            # needs the Reachy Mini daemon (robot, or: reachy-mini-daemon --sim)
+  host: "localhost"
+  port: 8000            # the daemon's port; run the console on another one (server.port or --port)
+  connection_mode: "auto"
+  tts_rate: 175         # offline TTS (SAPI on Windows, espeak-ng on Linux), words per minute
+  tts_voice: null       # substring of an installed voice name
 
 avct:
   default_polar_level: 2
@@ -36,6 +52,7 @@ operator:
   review_mode: "timed"          # "timed": auto-send after hold_seconds unless blocked; "manual": every response needs Send
   hold_seconds: 3.0             # review window in timed mode
   block_auto_send_at: "Orange"  # responses rated Orange or Red always need an explicit Send (or Temper)
+  model_can_end_session: false  # the model's [END] token only suggests ending; the operator decides
 
 # Optional psychosocial monitor (DialogGuard's five dimensions, one LLM call per response).
 monitor:
@@ -45,6 +62,18 @@ monitor:
   api_key_env: "GROK_API_KEY"
   timeout_s: 20.0
   gate_auto_send: true   # timed auto-send waits for the scores; a score of 2 or a monitor failure blocks it
+
+# Optional fidelity monitor: does the reply enact the requested antagonism, or is it softened?
+fidelity:
+  detector_enabled: false               # offline DistilBERT softening detector (advisory)
+  detector_path: "models/fidelity_detector"   # train with tools/train_fidelity_detector.py
+  detector_device: "auto"
+  judge_enabled: false                  # LLM judge with the RAGE benchmark rubric (0-10)
+  judge_base_url: "https://api.openai.com/v1"
+  judge_model: "gpt-4o"
+  judge_api_key_env: "OPENAI_API_KEY"
+  judge_timeout_s: 20.0
+  block_auto_send_below: 4              # judge fidelity below this blocks auto-send; null = advisory only
 
 logging:
   db_path: "data/Antagonistic Robot.db"

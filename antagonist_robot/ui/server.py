@@ -45,7 +45,7 @@ class SettingsUpdateRequest(BaseModel):
 
 class OperatorActionRequest(BaseModel):
     """Request body for POST /api/operator/action."""
-    action: str                      # send | temper | regenerate | hold
+    action: str                      # send | temper | intensify | regenerate | hold
     candidate_id: Optional[int] = None
 
 
@@ -127,6 +127,7 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
             "elapsed_seconds": round(manager.elapsed_seconds, 1),
             **manager.settings(),
             "review": manager.gate.status(),
+            "capabilities": manager.capabilities,
         }
 
     @app.get("/api/settings")
@@ -154,7 +155,7 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
 
     @app.post("/api/operator/action")
     async def operator_action(req: OperatorActionRequest):
-        if req.action not in ("send", "temper", "regenerate", "hold"):
+        if req.action not in ("send", "temper", "intensify", "regenerate", "hold"):
             return JSONResponse(status_code=400, content={"error": f"unknown action {req.action!r}"})
         ok = manager.operator_action(req.candidate_id, req.action)
         if not ok:

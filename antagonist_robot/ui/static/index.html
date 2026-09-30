@@ -22,7 +22,8 @@
   .state-pill.review b { color: var(--orange); } .state-pill.speaking b { color: var(--green); }
   .spacer { flex: 1; }
   .meta { color: var(--muted); font-size: 13px; }
-  main { flex: 1; display: grid; grid-template-columns: 330px 1fr 290px; gap: 14px; padding: 14px; min-height: 0; }
+  main { flex: 1; display: grid; grid-template-columns: 330px 1fr 300px; gap: 14px; padding: 14px; min-height: 0; }
+  main > .col:last-child { overflow-y: auto; }
   .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
   .card h2 { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
@@ -91,6 +92,7 @@
   <h1>RAWR <span>Operator Console</span></h1>
   <div class="state-pill" id="statePill">Robot state: <b id="stateText">idle</b></div>
   <div class="meta">Turn <b id="turnNo">0</b> &middot; <span id="elapsed">0:00</span> &middot; session <span id="sessionId">none</span></div>
+  <div class="meta" id="robotCaps"></div>
   <div class="spacer"></div>
   <button class="btn warn" id="stopSpeechBtn" title="Interrupt the robot's current utterance; the session continues">Stop speech <kbd>S</kbd></button>
   <button class="btn danger" id="endBtn" disabled>End session</button>
@@ -150,6 +152,7 @@
         <div class="actions">
           <button class="btn good" id="sendBtn">Send now <kbd>Enter</kbd></button>
           <button class="btn primary" id="temperBtn">Temper <kbd>T</kbd></button>
+          <button class="btn" id="intensifyBtn" title="Regenerate one polar level higher (this reply only), e.g. when the reply is softened">Intensify <kbd>I</kbd></button>
           <button class="btn" id="regenBtn">Regenerate <kbd>R</kbd></button>
           <button class="btn" id="holdBtn">Hold <kbd>H</kbd></button>
         </div>
@@ -168,6 +171,17 @@
         <span>Turn rating</span><span class="badge gray" id="sTurn">-</span>
       </div>
       <ul class="flags" id="sFlags"></ul>
+    </div>
+    <div class="card">
+      <h2>Fidelity (manipulation check)</h2>
+      <div class="kv">
+        <span>Requested</span><span id="fReq">-</span>
+        <span>Judge: fidelity</span><span id="fJudge">-</span>
+        <span>Judge: exhibits</span><span id="fExhibit">-</span>
+        <span>Detector: P(faithful)</span><span id="fDet">-</span>
+      </div>
+      <div class="note" id="fNote">Fidelity monitor off (fidelity.* in config.yaml).</div>
+      <svg id="fTrend" width="100%" height="46" viewBox="0 0 260 46" preserveAspectRatio="none" style="margin-top:6px" aria-label="Judge fidelity of spoken replies by turn"></svg>
     </div>
     <div class="card">
       <h2>Psychosocial monitor</h2>
@@ -275,7 +289,9 @@ function showPending(ev) {
   $("pending").classList.add("show"); $("pRisk").className = "badge " + ev.risk_rating; $("pRisk").textContent = ev.risk_rating;
   $("pMeta").textContent = `turn ${ev.turn_number}, attempt ${ev.attempt} · ${ev.category}${ev.subtype} at ${signed(ev.polar_level)}` + (ev.modifiers.length ? " · " + ev.modifiers.join(" ") : "") + (ev.generation_reason !== "initial" ? ` · ${ev.generation_reason}` : "");
   $("pText").textContent = ev.response;
-  $("pBlocked").textContent = ev.auto_release ? (ev.awaiting_monitor ? "Auto-send waits for the psychosocial monitor." : "") : "Needs your decision: " + ev.blocked_reasons.join(", ");
+  const waits = (ev.awaiting || []).map(a => a === "judge" ? "the fidelity judge" : "the psychosocial monitor");
+  $("pBlocked").textContent = ev.auto_release ? (waits.length ? "Auto-send waits for " + waits.join(" and ") + "." : "") : "Needs your decision: " + ev.blocked_reasons.join(", ");
+  resetFidelity(ev);
   $("pBarWrap").style.display = ev.auto_release ? "block" : "none";
   if (ev.auto_release) {
     const t0 = Date.now(), total = ev.hold_seconds * 1000;
@@ -294,12 +310,14 @@ async function act(action) {
   if (r.ok && action === "hold") blockPending("held by operator");
 }
 $("sendBtn").onclick = () => act("send"); $("temperBtn").onclick = () => act("temper");
+$("intensifyBtn").onclick = () => act("intensify");
 $("regenBtn").onclick = () => act("regenerate"); $("holdBtn").onclick = () => act("hold");
 
 document.addEventListener("keydown", e => {
   if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
   const k = e.key.toLowerCase();
   if (k === "enter") act("send"); else if (k === "t") act("temper"); else if (k === "r") act("regenerate");
+  else if (k === "i") act("intensify");
   else if (k === "h") act("hold"); else if (k === "s") api("/api/robot/stop", {}); else if (k === "a") applySettings();
 });
 
@@ -308,6 +326,39 @@ function badge(id, level) { $(id).className = "badge " + (level || "gray"); $(id
 function renderSafety(ev) {
   badge("sContent", ev.content_risk); badge("sConfig", ev.config_risk); badge("sTurn", ev.risk_rating);
   $("sFlags").innerHTML = (ev.content_flags || []).map(f => `<li><b>${esc(f.level)}</b> ${esc(f.category.replace(/_/g, " "))}: "${esc(f.match)}"</li>`).join("");
+}
+const CATNAME = Object.fromEntries(CATS);
+const FID = { byCandidate: {}, trend: [] };   // judge fidelity of spoken replies, in turn order
+function resetFidelity(ev) {
+  const on = S.caps && (S.caps.fidelity.detector || S.caps.fidelity.judge);
+  $("fReq").textContent = ev.polar_level > 0 ? `${ev.category}${ev.subtype} at ${signed(ev.polar_level)}` : `${signed(ev.polar_level)} (not scored)`;
+  ["fJudge", "fExhibit", "fDet"].forEach(id => $(id).textContent = on && ev.polar_level > 0 ? "…" : "-");
+}
+function renderFidelity(ev) {
+  const rec = FID.byCandidate[ev.candidate_id] = { ...(FID.byCandidate[ev.candidate_id] || {}), [ev.source]: ev };
+  if (!S.pending || S.pending.candidate_id !== ev.candidate_id) { updateTrend(ev.candidate_id); return; }
+  if (ev.source === "judge") {
+    if (ev.error) { $("fJudge").textContent = "error"; $("fNote").textContent = "Judge: " + ev.error; return; }
+    const low = S.caps.fidelity.block_below != null && ev.fidelity < S.caps.fidelity.block_below;
+    $("fJudge").innerHTML = `<b style="color:${low ? "var(--red)" : "var(--green)"}">${ev.fidelity}/10</b>` + (ev.refused ? " (refused)" : "");
+    $("fExhibit").textContent = `${ev.matched_category}${CATNAME[ev.matched_category] ? " " + CATNAME[ev.matched_category] : ""}, intensity ${ev.intensity_est}`;
+    $("fNote").textContent = ev.rationale ? `${ev.rationale} (${ev.latency_ms} ms)` : "";
+  } else {
+    $("fDet").innerHTML = ev.error ? "error" : `<b style="color:${ev.softened ? "var(--orange)" : "var(--green)"}">${ev.p_faithful.toFixed(2)}</b>${ev.softened ? " softened?" : ""}`;
+  }
+}
+function updateTrend(cid) {
+  const i = FID.trend.findIndex(t => t.cid === cid);
+  const j = FID.byCandidate[cid] && FID.byCandidate[cid].judge;
+  if (i >= 0 && j && !j.error) { FID.trend[i].v = j.fidelity; drawTrend(); }
+}
+function drawTrend() {
+  const pts = FID.trend.filter(t => t.v != null), w = 260, h = 46;
+  if (!pts.length) { $("fTrend").innerHTML = ""; return; }
+  const x = k => pts.length === 1 ? w / 2 : 6 + k * (w - 12) / (pts.length - 1), y = v => h - 4 - v * (h - 8) / 10;
+  const thr = S.caps && S.caps.fidelity.block_below != null ? `<line x1="0" x2="${w}" y1="${y(S.caps.fidelity.block_below)}" y2="${y(S.caps.fidelity.block_below)}" stroke="#dc2626" stroke-dasharray="4 3" stroke-width="1"/>` : "";
+  $("fTrend").innerHTML = thr + `<polyline fill="none" stroke="#2563eb" stroke-width="2" points="${pts.map((p, k) => x(k) + "," + y(p.v)).join(" ")}"/>` +
+    pts.map((p, k) => `<circle cx="${x(k)}" cy="${y(p.v)}" r="3" fill="#2563eb"><title>turn ${p.turn}: ${p.v}/10</title></circle>`).join("");
 }
 function resetDims() { DIMS.forEach(([k]) => { $("d_" + k).textContent = "-"; $("b_" + k).style.width = "0"; }); }
 function renderDims(ev) {
@@ -331,16 +382,19 @@ function connect() {
     else if (ev.type === "participant_distress") { $("distress").textContent = "Participant distress cue: " + ev.cues.join(", ") + ". Automatic release is off for this reply."; $("distress").classList.add("show"); }
     else if (ev.type === "candidate") showPending(ev);
     else if (ev.type === "candidate_blocked") blockPending(ev.reason);
-    else if (ev.type === "candidate_replaced") { addMsg("r discarded", "Robot (not spoken)", S.pending ? S.pending.response : "", ev.action === "temper" ? `tempered to ${signed(ev.new_polar_level)}` : "regenerated"); clearPending(); }
+    else if (ev.type === "candidate_replaced") { addMsg("r discarded", "Robot (not spoken)", S.pending ? S.pending.response : "", ev.action === "temper" ? `tempered to ${signed(ev.new_polar_level)}` : ev.action === "intensify" ? `intensified to ${signed(ev.new_polar_level)}` : "regenerated"); clearPending(); }
+    else if (ev.type === "fidelity") renderFidelity(ev);
     else if (ev.type === "monitor") { $("dimNote").textContent = ""; renderDims(ev);
       if (S.pending && S.pending.candidate_id === ev.candidate_id && S.pending.auto_release && $("pBlocked").textContent.startsWith("Auto-send waits")) $("pBlocked").textContent = ""; }
     else if (ev.type === "speaking") { const p = S.pending; clearPending();
       const d = addMsg("r", "Robot", ev.response, p ? `${p.category}${p.subtype} at ${signed(p.polar_level)} · ${p.risk_rating}` : "");
-      if (p) d.style.borderLeftColor = `var(--${p.risk_rating.toLowerCase()})`; }
+      if (p) d.style.borderLeftColor = `var(--${p.risk_rating.toLowerCase()})`;
+      if (p && p.polar_level > 0) { FID.trend.push({ cid: ev.candidate_id, turn: p.turn_number, v: null }); updateTrend(ev.candidate_id); } }
     else if (ev.type === "turn_complete") { renderLatency(ev.latency); $("turnNo").textContent = ev.turn_number; }
     else if (ev.type === "speech_stopped") addNote(ev.stopped ? "Robot speech stopped by operator." : "Stop sent (robot was not speaking).");
     else if (ev.type === "session_ended") { if (S.running) sessionEnded(ev.reason || "ended"); }
     else if (ev.type === "error") addNote("Error: " + ev.message);
+    else if (ev.type === "end_suggested") addNote("The model suggested ending the conversation here. The session continues; use End session to stop.");
   };
   ws.onclose = () => setTimeout(connect, 1500);
 }
@@ -354,6 +408,15 @@ setInterval(async () => {
 (async () => {
   const s = await api("/api/status");
   if (s.review) renderPolicy(s.review.review_mode, s.review.hold_seconds);
+  if (s.capabilities) {
+    const c = S.caps = s.capabilities;
+    $("robotCaps").innerHTML = `Robot: <b>${esc(c.robot)}</b> · Stop speech: ` +
+      (c.interrupt === "verified" ? "verified" : `<b style="color:var(--red)">${esc(c.interrupt)}</b>`);
+    if (c.interrupt !== "verified") $("stopSpeechBtn").title = "Interrupt is " + c.interrupt + " on this robot: " + c.notes;
+    if (c.fidelity.detector || c.fidelity.judge)
+      $("fNote").textContent = [c.fidelity.judge ? "judge on" + (c.fidelity.block_below != null ? `, blocks auto-send below ${c.fidelity.block_below}` : " (advisory)") : "judge off",
+                                c.fidelity.detector ? "detector on (advisory)" : "detector off"].join("; ");
+  }
   if (s.polar_level !== undefined) { S.polar = s.polar_level; S.cat = s.category; S.sub = s.subtype; S.mods = s.modifiers; }
   if (s.is_running) { S.running = true; S.session = s.session_id; S.applied = [S.polar, S.cat, S.sub, [...S.mods].sort()];
     $("sessionId").textContent = s.session_id; $("startBtn").disabled = true; $("endBtn").disabled = false; $("jsonBtn").disabled = $("csvBtn").disabled = false; }

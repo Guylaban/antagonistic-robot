@@ -22,15 +22,15 @@ from typing import Callable, Optional
 import numpy as np
 
 from antagonist_robot.conversation.avct_manager import AvctManager
+from antagonist_robot.conversation.fidelity import FidelityMonitor
 from antagonist_robot.conversation.history import ConversationHistory
 from antagonist_robot.conversation.monitor import MonitorResult, PsychosocialMonitor
 from antagonist_robot.conversation.operator import OperatorGate
 from antagonist_robot.conversation.safety import SafetyChecker, config_risk, max_risk
 from antagonist_robot.logging.session_logger import SessionLogger
-from antagonist_robot.nao.base import NAOAdapter
-from antagonist_robot.pipeline.audio_output import NAOAudioOutput
 from antagonist_robot.pipeline.llm import LLMEngine
 from antagonist_robot.pipeline.types import LLMResult, TurnResult
+from antagonist_robot.robots.base import RobotBackend, SpeechCue
 
 log = logging.getLogger(__name__)
 
@@ -69,26 +69,28 @@ class ConversationManager:
         audio_capture,
         asr,
         llm: LLMEngine,
-        audio_output: NAOAudioOutput,
+        robot: RobotBackend,
         avct_manager: AvctManager,
         session_logger: SessionLogger,
-        nao_adapter: NAOAdapter,
         gate: OperatorGate,
         safety: Optional[SafetyChecker] = None,
         monitor: Optional[PsychosocialMonitor] = None,
+        fidelity: Optional[FidelityMonitor] = None,
         config_snapshot: Optional[dict] = None,
+        model_can_end_session: bool = False,
     ):
         self._capture = audio_capture
         self._asr = asr
         self._llm = llm
-        self._output = audio_output
+        self._robot = robot
         self._avct = avct_manager
         self._logger = session_logger
-        self._nao = nao_adapter
         self._gate = gate
         self._safety = safety or SafetyChecker()
         self._monitor = monitor
+        self._fidelity = fidelity
         self._config_snapshot = config_snapshot
+        self._model_can_end = model_can_end_session
 
         self._history = ConversationHistory()
         self._session_id: Optional[str] = None
@@ -125,6 +127,16 @@ class ConversationManager:
     @property
     def gate(self) -> OperatorGate: return self._gate
     @property
+    def capabilities(self) -> dict:
+        caps = self._robot.capabilities.as_dict()
+        caps["fidelity"] = {
+            "detector": bool(self._fidelity and self._fidelity.detector_enabled),
+            "judge": bool(self._fidelity and self._fidelity.judge_enabled),
+            "block_below": self._fidelity.block_below if self._fidelity else None,
+        }
+        caps["monitor"] = bool(self._monitor and self._monitor.enabled)
+        return caps
+    @property
     def elapsed_seconds(self) -> float:
         if self._session_start_time is None:
             return 0.0
@@ -153,7 +165,7 @@ class ConversationManager:
                                    payload={"source": source, **self.settings()})
 
     def operator_action(self, candidate_id: Optional[int], action: str) -> bool:
-        """Apply an operator action (send, temper, regenerate, hold) to the pending response."""
+        """Apply an operator action (send, temper, intensify, regenerate, hold) to the pending response."""
         ok = self._gate.act(candidate_id, action)
         if ok and action == "hold":
             self._logger.log_event(self._session_id, "hold", self._turn_count, candidate_id)
@@ -169,8 +181,9 @@ class ConversationManager:
 
     def stop_speech(self) -> bool:
         """Emergency stop: interrupt the robot's current utterance; the session continues."""
-        stopped = self._output.stop()
-        self._logger.log_event(self._session_id, "stop_speech", self._turn_count, payload={"stopped": stopped})
+        stopped = self._robot.stop()
+        self._logger.log_event(self._session_id, "stop_speech", self._turn_count,
+                               payload={"stopped": stopped, "interrupt": self._robot.capabilities.interrupt})
         return stopped
 
     # --- internals -------------------------------------------------------------
@@ -210,6 +223,18 @@ class ConversationManager:
             self._emit({"type": "candidate_blocked", "candidate_id": candidate_id, "reason": reason})
         self._gate.monitor_done(candidate_id)
 
+    def _on_fidelity(self, candidate_id: int, session_id: str, turn_number: int, source: str, result: dict) -> None:
+        self._logger.update_candidate(candidate_id, **{f"fidelity_{source}_json": result})
+        self._emit({"type": "fidelity", "candidate_id": candidate_id, "source": source,
+                    **{k: v for k, v in result.items() if k != "raw"}})
+        if source == "judge":
+            reason = self._fidelity.below_threshold(result)
+            if reason and self._gate.escalate(candidate_id, reason):
+                self._logger.log_event(session_id, "fidelity_block", turn_number, candidate_id,
+                                       {k: v for k, v in result.items() if k != "raw"})
+                self._emit({"type": "candidate_blocked", "candidate_id": candidate_id, "reason": reason})
+            self._gate.signal_done(candidate_id, "judge")
+
     # --- session lifecycle ---------------------------------------------------------
 
     def start_session(self, polar_level: int, category: str, subtype: int, modifiers: list, participant_id: str) -> str:
@@ -232,7 +257,8 @@ class ConversationManager:
             modifiers=self._modifiers,
             config_snapshot=self._config_snapshot,
         )
-        self._logger.log_event(self._session_id, "session_start", 0, payload=self.settings())
+        self._logger.log_event(self._session_id, "session_start", 0,
+                               payload={**self.settings(), "capabilities": self.capabilities})
         return self._session_id
 
     def end_session(self, reason: str = "operator") -> dict:
@@ -240,9 +266,9 @@ class ConversationManager:
         self._running = False
         self._gate.end()
         if was_speaking:
-            self._output.stop()  # cut the robot off mid-utterance
+            self._robot.stop()  # cut the robot off mid-utterance
         self._set_state(SystemState.IDLE)
-        self._nao.on_idle()
+        self._robot.on_idle()
 
         summary = {
             "session_id": self._session_id,
@@ -270,7 +296,7 @@ class ConversationManager:
         # 1-2. Capture and transcribe; keep listening if Whisper hears nothing
         while True:
             self._set_state(SystemState.LISTENING)
-            self._nao.on_listening()
+            self._robot.on_listening()
             t0 = time.monotonic()
             audio = self._capture.record_utterance(is_active=lambda: self._is_current(session_id))
             if audio is None:
@@ -289,6 +315,7 @@ class ConversationManager:
         self._turn_count += 1
         turn_number = self._turn_count
         transcript = asr_result.text
+        self._robot.on_thinking()
         self._emit({"type": "participant", "turn_number": turn_number, "transcript": transcript})
 
         distress = self._safety.check_participant(transcript)
@@ -337,8 +364,13 @@ class ConversationManager:
             }, reasoning=llm_result.reasoning)
 
             monitoring = self._monitor is not None and self._monitor.enabled
-            terms = self._gate.open(candidate_id, risk, bool(distress),
-                                    await_monitor=monitoring and self._monitor.gate_auto_send)
+            scoring = self._fidelity is not None and self._fidelity.enabled and self._fidelity.applies(polar, category)
+            awaiting = []
+            if monitoring and self._monitor.gate_auto_send:
+                awaiting.append("monitor")
+            if scoring and self._fidelity.gates(polar, category):
+                awaiting.append("judge")
+            terms = self._gate.open(candidate_id, risk, bool(distress), await_signals=awaiting)
             self._logger.update_candidate(candidate_id, auto_release=int(terms["auto_release"]),
                                           blocked_reasons_json=terms["blocked_reasons"])
             if not self._is_current(session_id):
@@ -358,13 +390,20 @@ class ConversationManager:
                     transcript, response_text,
                     lambda r, cid=candidate_id: self._on_monitor(cid, session_id, turn_number, r),
                 )
+            if scoring:
+                self._fidelity.score_async(
+                    transcript, response_text, polar, category, subtype,
+                    lambda src, r, cid=candidate_id: self._on_fidelity(cid, session_id, turn_number, src, r),
+                )
 
             decision = self._gate.wait(lambda: self._is_current(session_id))
             review_ms_total += decision.wait_ms
 
-            if decision.action in ("temper", "regenerate"):
-                disposition = "tempered" if decision.action == "temper" else "regenerated"
-                new_polar = max(-3, polar - 1) if decision.action == "temper" else polar
+            if decision.action in ("temper", "intensify", "regenerate"):
+                disposition = {"temper": "tempered", "intensify": "intensified",
+                               "regenerate": "regenerated"}[decision.action]
+                new_polar = {"temper": max(-3, polar - 1), "intensify": min(3, polar + 1),
+                             "regenerate": polar}[decision.action]
                 self._logger.decide_candidate(candidate_id, disposition, decision.decided_by, decision.wait_ms)
                 self._logger.log_event(session_id, decision.action, turn_number, candidate_id,
                                        {"from_polar": polar, "to_polar": new_polar})
@@ -388,16 +427,21 @@ class ConversationManager:
         latency["llm_ms"] = llm_ms_total
         latency["review_ms"] = review_ms_total
         if end_detected:
-            self._end_requested = True
+            # Ending the session is the operator's decision unless configured otherwise
+            self._logger.log_event(session_id, "model_end_signal", turn_number, candidate_id,
+                                   {"ends_session": self._model_can_end})
+            if self._model_can_end:
+                self._end_requested = True
+            else:
+                self._emit({"type": "end_suggested", "turn_number": turn_number, "candidate_id": candidate_id})
 
-        # 6. Robot speech (built-in NAOqi TTS); the [END] token never reaches the robot
+        # 6. Robot speech through the configured backend; the [END] token never reaches the robot
         self._set_state(SystemState.SPEAKING)
         self._emit({"type": "speaking", "candidate_id": candidate_id, "response": response_text})
         t3 = time.monotonic()
-        completed = self._output.speak_text(response_text)
+        completed = self._robot.speak(response_text, SpeechCue(polar, category, subtype, modifiers))
         latency["speech_ms"] = round((time.monotonic() - t3) * 1000)
         latency["total_ms"] = round((time.monotonic() - t0) * 1000)
-        self._nao.on_response(response_text, polar)
         self._history.add_assistant_message(response_text)
 
         turn_result = TurnResult(

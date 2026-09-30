@@ -1,6 +1,6 @@
 # RAWR (Antagonistic Robot) — notes for Claude
 
-Operator console for HRI studies with an antagonistic robot: laptop mic → Silero VAD → faster-whisper → LLM (OpenAI-compatible API) → SafetyChecker (+ optional psychosocial monitor) → **operator review gate** → text over TCP to `nao_speaker_server.py` on the NAO, which speaks it with NAO's built-in TTS. There is no laptop-speaker route. See README.md for setup and the troubleshooting table.
+Operator console for HRI studies with an antagonistic robot: laptop mic → Silero VAD → faster-whisper → LLM (OpenAI-compatible API) → SafetyChecker (+ optional psychosocial monitor) (+ optional fidelity judge/detector) → **operator review gate** → a robot backend (`antagonist_robot/robots/`: `nao` via `nao_speaker_server.py`, `furhat` via the Remote API, `reachy_mini` via its SDK, `text` for dry runs). NAO/Pepper and Furhat speak with the robot's own TTS; Reachy Mini gets offline computer TTS (SAPI/espeak-ng) streamed to its speaker. See README.md for setup and the troubleshooting table.
 
 ## Status (2026-09-30)
 
@@ -39,6 +39,13 @@ python main.py             # web UI on http://localhost:8000
 On the lab laptop the working copy is `Desktop\job\naoqi\NAO_LLM` with a ready `venv`. Its `.exe` console shims (`pip.exe`, `uvicorn.exe`) are broken because the folder was moved; call `venv\Scripts\python.exe -m pip ...` instead. The venv itself works. Don't rebuild it on the phone hotspot (torch is ~2 GB).
 
 The operator console the server serves is the single file `antagonist_robot/ui/static/index.html` (no build step). The React `webui/` is the repo owner's panel design (its Temper button and DialogGuard scores are not wired to the backend); it is kept but no longer served. Don't discard edits to it.
+
+## Robots and fidelity
+
+- Backend status as of 2026-09-30: NAO tested only against the mock robot; Furhat against the virtual Furhat (SDK 2.9.2, where `say_stop` does NOT cut audio); Reachy Mini in the MuJoCo simulator (`reachy-mini-daemon --sim --headless`, needs `.venv-reachy` on Windows; on Linux reachy-mini needs PyGObject system libs). Run `tools/robot_smoke_test.py` on real hardware and record the result.
+- Reachy's daemon uses port 8000 like the console: run the console with `--port 8090`.
+- The fidelity detector weights (`models/fidelity_detector`, git-ignored, 268 MB) were trained on the lab GPU (`ssh lab`, `~/rawr_train/`) with `tools/train_fidelity_detector.py`. The judge prompt in `conversation/fidelity.py` is the RAGE rubric verbatim: don't edit it.
+- Don't use pyttsx3 for Reachy speech: repeated `runAndWait()` hangs or writes empty WAVs on Windows.
 
 ## LLM model
 

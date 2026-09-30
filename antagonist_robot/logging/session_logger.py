@@ -122,6 +122,8 @@ class SessionLogger:
                 auto_release INTEGER,
                 blocked_reasons_json TEXT,
                 monitor_json TEXT,
+                fidelity_detector_json TEXT,
+                fidelity_judge_json TEXT,
                 disposition TEXT,
                 decided_by TEXT,
                 decided_at TEXT,
@@ -167,6 +169,9 @@ class SessionLogger:
             "ALTER TABLE turns ADD COLUMN participant_distress_json TEXT",
             "ALTER TABLE turns ADD COLUMN latency_review_ms INTEGER",
             "ALTER TABLE turns ADD COLUMN speech_completed INTEGER",
+            # fidelity monitor
+            "ALTER TABLE candidates ADD COLUMN fidelity_detector_json TEXT",
+            "ALTER TABLE candidates ADD COLUMN fidelity_judge_json TEXT",
         ]
         for query in migrations:
             try:
@@ -369,6 +374,8 @@ class SessionLogger:
         "content_risk", "content_flags", "config_risk", "risk_rating", "participant_distress",
         "auto_release", "blocked_reasons", "monitor_privacy", "monitor_discrimination",
         "monitor_manipulation", "monitor_psych_harm", "monitor_insulting", "monitor_rationale",
+        "judge_fidelity", "judge_category", "judge_intensity", "judge_refused", "judge_rationale",
+        "detector_p_faithful",
         "disposition", "decided_by", "review_ms", "spoken",
     ]
 
@@ -388,6 +395,8 @@ class SessionLogger:
         writer.writeheader()
         for r in rows:
             monitor = json.loads(r.get("monitor_json") or "{}") or {}
+            judge = json.loads(r.get("fidelity_judge_json") or "{}") or {}
+            detector = json.loads(r.get("fidelity_detector_json") or "{}") or {}
             scores = monitor.get("scores") or {}
             flags = json.loads(r.get("content_flags_json") or "[]")
             r.update({
@@ -397,6 +406,9 @@ class SessionLogger:
                 "blocked_reasons": "; ".join(json.loads(r.get("blocked_reasons_json") or "[]")),
                 "monitor_rationale": monitor.get("rationale", ""),
                 "spoken": int(r.get("disposition") in ("sent", "auto_sent")),
+                "judge_fidelity": judge.get("fidelity"), "judge_category": judge.get("matched_category"),
+                "judge_intensity": judge.get("intensity_est"), "judge_refused": judge.get("refused"),
+                "judge_rationale": judge.get("rationale"), "detector_p_faithful": detector.get("p_faithful"),
                 **{f"monitor_{k}": scores.get(k) for k in
                    ("privacy", "discrimination", "manipulation", "psych_harm", "insulting")},
             })

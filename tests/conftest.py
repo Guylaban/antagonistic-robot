@@ -24,6 +24,7 @@ from antagonist_robot.conversation.operator import OperatorGate  # noqa: E402
 from antagonist_robot.logging.session_logger import SessionLogger  # noqa: E402
 from antagonist_robot.nao.base import NAOAdapter  # noqa: E402
 from antagonist_robot.pipeline.audio_output import NAOAudioOutput  # noqa: E402
+from antagonist_robot.robots.nao import NaoBackend  # noqa: E402
 from antagonist_robot.pipeline.scripted_input import ScriptedParticipant  # noqa: E402
 from antagonist_robot.pipeline.types import LLMResult  # noqa: E402
 
@@ -85,7 +86,8 @@ def mock_robot():
 def make_manager(tmp_path, mock_robot):
     """Factory for a ConversationManager wired to fakes and the mock robot."""
 
-    def _make(utterances, llm_texts=None, review_mode="timed", hold_seconds=0.2, block_at="Orange", monitor=None):
+    def _make(utterances, llm_texts=None, review_mode="timed", hold_seconds=0.2, block_at="Orange", monitor=None,
+              fidelity=None, robot=None):
         ip, port = mock_robot
         logger = SessionLogger(str(tmp_path / "test.db"), str(tmp_path / "audio"))
         participant = ScriptedParticipant(utterances, delay_s=0.0)
@@ -94,8 +96,8 @@ def make_manager(tmp_path, mock_robot):
                                            block_auto_send_at=block_at))
         manager = ConversationManager(
             audio_capture=participant, asr=participant, llm=llm,
-            audio_output=NAOAudioOutput(ip, port), avct_manager=AvctManager(AvctConfig()),
-            session_logger=logger, nao_adapter=NullNAO(), gate=gate, monitor=monitor,
+            robot=robot or NaoBackend(ip, port), avct_manager=AvctManager(AvctConfig()),
+            session_logger=logger, gate=gate, monitor=monitor, fidelity=fidelity,
         )
         events = []
         manager.on_event = events.append
