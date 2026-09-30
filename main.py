@@ -60,6 +60,17 @@ def main():
     from antagonist_robot.pipeline.llm import LLMEngine
     print(f"  LLM: {config.llm.provider_name} ({config.llm.model})")
     llm = LLMEngine(config.llm)
+    # Fail now rather than mid-session: a bad key or retired model would
+    # otherwise make every turn speak the "I see. Go on." fallback line.
+    try:
+        llm.generate("Reply with the word ok.", [{"role": "user", "content": "ping"}])
+    except Exception as e:
+        print(
+            f"\n  ERROR: LLM check failed for model '{config.llm.model}' at "
+            f"{config.llm.base_url}:\n  {e}\n"
+            f"  Check {config.llm.api_key_env} in .env and llm.model in config.yaml."
+        )
+        sys.exit(1)
 
     # Robot: speech is produced by the robot's built-in TTS via nao_speaker_server.py
     from antagonist_robot.nao.real import RealNAO

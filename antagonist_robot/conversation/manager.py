@@ -312,7 +312,7 @@ class ConversationManager:
             try:
                 llm_result = self._llm.generate(system_prompt, messages)
             except Exception as e:
-                log.warning("LLM error: %s", e)
+                log.error("LLM error, using fallback line: %s", e)
                 llm_result = LLMResult(text=FALLBACK_RESPONSE, model="fallback", total_tokens=0,
                                        generation_time_seconds=time.monotonic() - t2)
             llm_ms = round((time.monotonic() - t2) * 1000)

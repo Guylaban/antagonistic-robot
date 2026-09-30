@@ -182,6 +182,7 @@ antagonist_robot/
   pipeline/                      audio capture, ASR, LLM client, robot speech, scripted participant
   logging/session_logger.py      SQLite logging and export
   ui/server.py, ui/static/index.html   FastAPI server and operator console (no build step)
+webui/                       earlier React panel design (not served by the server)
 tools/mock_nao.py, tools/fake_naoqi/   robot-free dry runs and tests
 examples/                    demo script and demo session
 tests/                       offline test suite

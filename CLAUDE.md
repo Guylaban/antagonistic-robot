@@ -38,7 +38,11 @@ python main.py             # web UI on http://localhost:8000
 
 On the lab laptop the working copy is `Desktop\job\naoqi\NAO_LLM` with a ready `venv`. Its `.exe` console shims (`pip.exe`, `uvicorn.exe`) are broken because the folder was moved; call `venv\Scripts\python.exe -m pip ...` instead. The venv itself works. Don't rebuild it on the phone hotspot (torch is ~2 GB).
 
-The operator console is the single file `antagonist_robot/ui/static/index.html` (no build step). The old React `webui/` was removed on branch `hri27-operator-console`; the lab laptop may still have uncommitted `webui/src/App.js` edits by the repo owner, so don't discard them.
+The operator console the server serves is the single file `antagonist_robot/ui/static/index.html` (no build step). The React `webui/` is the repo owner's panel design (its Temper button and DialogGuard scores are not wired to the backend); it is kept but no longer served. Don't discard edits to it.
+
+## LLM model
+
+`llm.model` must be a **non-reasoning** model: every second of generation is silence in front of the participant. x.ai retires and silently re-routes model names (`grok-4-fast` became a slow reasoning model in 2026), so if replies start taking several seconds, list models with `GET https://api.x.ai/v1/models` and time a few. `main.py` makes one test call at startup and exits if the key or model is bad.
 
 ## Conventions
 
