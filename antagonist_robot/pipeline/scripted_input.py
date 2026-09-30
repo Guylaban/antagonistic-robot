@@ -18,20 +18,25 @@ import yaml
 from antagonist_robot.pipeline.types import ASRResult, AudioData
 
 
-def load_script(path: str) -> List[str]:
-    """Read the utterance list from a YAML script file."""
+def load_script(path: str) -> List:
+    """Read the utterance list from a YAML script file.
+
+    Each entry is a string, or {"text": ..., "delay_s": ...} to set how long the
+    participant 'speaks' before the utterance is delivered (e.g. its audio duration).
+    """
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
     utterances = data.get("utterances", [])
     if not utterances:
         raise ValueError(f"{path} has no 'utterances' list")
-    return [str(u) for u in utterances]
+    return [u if isinstance(u, dict) else str(u) for u in utterances]
 
 
 class ScriptedParticipant:
     """Stands in for AudioCapture and ASREngine with scripted utterances."""
 
-    def __init__(self, utterances: List[str], delay_s: float = 1.5):
-        self._utterances = list(utterances)
+    def __init__(self, utterances: List, delay_s: float = 1.5):
+        self._utterances = [u["text"] if isinstance(u, dict) else u for u in utterances]
+        self._delays = [float(u.get("delay_s", delay_s)) if isinstance(u, dict) else delay_s for u in utterances]
         self._delay_s = delay_s
         self._next = 0
         self._pending: Optional[str] = None
@@ -47,7 +52,8 @@ class ScriptedParticipant:
         """
         is_active = is_active or (lambda: True)
         started = datetime.now(timezone.utc).isoformat()
-        deadline = time.monotonic() + self._delay_s
+        delay = self._delays[self._next] if not self.exhausted else self._delay_s
+        deadline = time.monotonic() + delay
         while is_active() and (time.monotonic() < deadline or self.exhausted):
             time.sleep(0.05)
         if not is_active():

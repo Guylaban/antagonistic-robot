@@ -21,7 +21,8 @@ def create_backend(config) -> RobotBackend:
         from antagonist_robot.robots.reachy_mini import ReachyMiniBackend
         r = config.reachy_mini
         return ReachyMiniBackend(host=r.host, port=r.port, connection_mode=r.connection_mode,
-                                 tts_rate=r.tts_rate, tts_voice=r.tts_voice, expressions=expressions)
+                                 tts_rate=r.tts_rate, tts_voice=r.tts_voice, expressions=expressions,
+                                 speech_log_dir=r.speech_log_dir)
     if name == "text":
         from antagonist_robot.robots.text import TextBackend
         return TextBackend()

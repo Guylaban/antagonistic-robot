@@ -179,9 +179,10 @@ class ReachyMiniBackend(RobotBackend):
 
     def __init__(self, host: str = "localhost", port: int = 8000, connection_mode: str = "auto",
                  tts_rate: Optional[int] = 175, tts_voice: Optional[str] = None, expressions: bool = False,
-                 poses: Optional[dict] = None, mini=None, tts=None):
+                 poses: Optional[dict] = None, mini=None, tts=None, speech_log_dir: Optional[str] = None):
         self._host, self._port, self._mode = host, port, connection_mode
         self._expressions = expressions
+        self._speech_log_dir = speech_log_dir
         self._poses = {**DEFAULT_POSES, **(poses or {})}
         self._mini = mini
         self._tts = tts
@@ -236,11 +237,14 @@ class ReachyMiniBackend(RobotBackend):
         self._playing = True
         step = int(sr_out * CHUNK_S)
         t0 = time.monotonic()
+        wall_start = time.time()
+        played = 0
         try:
             for i, start in enumerate(range(0, len(audio), step)):
                 if self._stop.is_set():
                     return False
                 media.push_audio_sample(audio[start:start + step])
+                played = min(len(audio), start + step)
                 # push_audio_sample is non-blocking: pace pushes in real time
                 delay = t0 + (i + 1) * CHUNK_S - time.monotonic()
                 if delay > 0:
@@ -250,6 +254,24 @@ class ReachyMiniBackend(RobotBackend):
             media.stop_playing()
             self._playing = False
             self._pose("neutral", 0.4)
+            if self._speech_log_dir:
+                self._log_speech(text, audio[:played, 0], sr_out, wall_start, played < len(audio))
+
+    def _log_speech(self, text: str, samples: np.ndarray, sr: int, wall_start: float, interrupted: bool) -> None:
+        """Archive the robot's utterance exactly as played (WAV + one JSON line per utterance)."""
+        import json
+        from pathlib import Path
+        d = Path(self._speech_log_dir)
+        d.mkdir(parents=True, exist_ok=True)
+        path = d / f"robot_{wall_start:.3f}.wav"
+        with wave.open(str(path), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(sr)
+            w.writeframes((np.clip(samples, -1, 1) * 32767).astype("<i2").tobytes())
+        with open(d / "speech_log.jsonl", "a", encoding="utf-8") as f:
+            f.write(json.dumps({"wall_start": wall_start, "file": path.name, "seconds": round(len(samples) / sr, 3),
+                                "interrupted": interrupted, "text": text}) + "\n")
 
     def stop(self) -> bool:
         self._stop.set()

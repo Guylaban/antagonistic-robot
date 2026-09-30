@@ -72,6 +72,7 @@ class ReachyMiniConfig:
     connection_mode: str = "auto"       # auto | localhost_only | network
     tts_rate: Optional[int] = 175       # words per minute for the offline TTS
     tts_voice: Optional[str] = None     # substring of an installed voice name
+    speech_log_dir: Optional[str] = None  # if set, archive each robot utterance as played (WAV + JSONL)
 
 
 @dataclass

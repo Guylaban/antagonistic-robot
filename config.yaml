@@ -42,6 +42,7 @@ reachy_mini:            # needs the Reachy Mini daemon (robot, or: reachy-mini-d
   connection_mode: "auto"
   tts_rate: 175         # offline TTS (SAPI on Windows, espeak-ng on Linux), words per minute
   tts_voice: null       # substring of an installed voice name
+  speech_log_dir: null  # e.g. data/robot_speech: archive each robot utterance as played (WAV + JSONL)
 
 avct:
   default_polar_level: 2
