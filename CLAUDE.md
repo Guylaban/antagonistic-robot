@@ -38,6 +38,10 @@ On the lab laptop the working copy is `Desktop\job\naoqi\NAO_LLM` with a ready `
 
 `webui/src/App.js` there may have uncommitted UI edits by the repo owner; don't discard them. Without `webui/build/`, the server serves the fallback UI in `antagonist_robot/ui/static/index.html`, which is fully functional.
 
+## LLM model
+
+`llm.model` must be a **non-reasoning** model: every second of generation is silence in front of the participant. x.ai retires and silently re-routes model names (`grok-4-fast` became a slow reasoning model in 2026), so if replies start taking several seconds, list models with `GET https://api.x.ai/v1/models` and time a few. `main.py` makes one test call at startup and exits if the key or model is bad.
+
 ## Conventions
 
 - Safety boundaries in `avct_manager.py` are always included in every prompt; don't add a code path that skips them.
