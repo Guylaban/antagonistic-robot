@@ -10,6 +10,7 @@ import logging
 import socket
 
 from antagonist_robot.nao.base import NAOAdapter
+from antagonist_robot.nao.host import resolve_ipv4
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +23,9 @@ class RealNAO(NAOAdapter):
     control is handled entirely by nao_speaker_server.py on the robot.
     """
 
-    def __init__(self, ip: str, naoqi_port: int = 9559, password: str = "nao"):
+    def __init__(self, ip: str, speaker_port: int = 9600, naoqi_port: int = 9559, password: str = "nao"):
         self._ip = ip
+        self._speaker_port = speaker_port
         self._port = naoqi_port
         self._password = password
         self._connected = False
@@ -31,19 +33,21 @@ class RealNAO(NAOAdapter):
     def connect(self) -> None:
         """Verify the robot is reachable by TCP-pinging the speaker server port.
 
-        Attempts a TCP connection to ip:9600 (the nao_speaker_server.py
-        port). If the connection succeeds, the robot is considered reachable.
+        Attempts a TCP connection to the nao_speaker_server.py port
+        (nao.port in config). If the connection succeeds, the robot is
+        considered reachable; check is_connected() afterwards.
         """
-        speaker_port = 9600
+        speaker_port = self._speaker_port
         try:
+            ip = resolve_ipv4(self._ip, speaker_port)
             with socket.create_connection(
-                (self._ip, speaker_port), timeout=5
+                (ip, speaker_port), timeout=5
             ):
                 pass  # Connection succeeded — robot is reachable
             self._connected = True
             logger.info(
-                "[RealNAO] Connected — robot reachable at %s:%d",
-                self._ip, speaker_port,
+                "[RealNAO] Connected — robot reachable at %s (%s):%d",
+                self._ip, ip, speaker_port,
             )
         except OSError as exc:
             self._connected = False

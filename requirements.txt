@@ -7,8 +7,6 @@ pyyaml>=6.0
 # Audio
 sounddevice>=0.5.0
 numpy>=2.0.0
-scipy>=1.14.0
-PyAudio>=0.2.14
 
 # VAD + ASR
 torch>=2.0.0
@@ -22,9 +20,6 @@ openai>=1.50.0
 python-dotenv>=1.0.0
 pydantic>=2.0.0
 
-# Audio playback
-pygame>=2.6.0
-
-# Optional: real NAO mode
-# paramiko>=3.5.0
+# NAO deployment (deploy_nao.py)
+paramiko>=3.5.0
 # naoqi SDK (not available via pip, install from Aldebaran developer portal)

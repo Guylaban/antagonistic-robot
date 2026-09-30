@@ -7,6 +7,7 @@ import socket
 import time
 from abc import ABC, abstractmethod
 
+from antagonist_robot.nao.host import resolve_ipv4
 from antagonist_robot.pipeline.types import TTSResult
 
 
@@ -65,10 +66,15 @@ class NAOAudioOutput(AudioOutputBase):
         Connects to nao_speaker_server.py running on the robot.
         Protocol: send text + newline, wait for "ok" response.
         Blocks until the robot finishes speaking.
+
+        Raises:
+            RuntimeError: if the robot is unreachable or never acknowledges,
+                so the turn fails loudly instead of being logged as spoken.
         """
         try:
+            ip = resolve_ipv4(self._ip, self._port)
             with socket.create_connection(
-                (self._ip, self._port), timeout=30
+                (ip, self._port), timeout=30
             ) as s:
                 s.sendall((text.strip() + "\n").encode("utf-8"))
                 # Wait for "ok" acknowledgement from the robot
@@ -80,8 +86,15 @@ class NAOAudioOutput(AudioOutputBase):
                     response += chunk
                     if b"ok" in response:
                         break
-        except Exception as e:
-            print(f"[NAO AUDIO] Socket error: {e}")
+        except OSError as e:
+            raise RuntimeError(
+                f"NAO speaker server at {self._ip}:{self._port} failed: {e}"
+            ) from e
+        if b"ok" not in response:
+            raise RuntimeError(
+                f"NAO speaker server at {self._ip}:{self._port} closed "
+                f"without acknowledging speech"
+            )
 
     def stop(self) -> None:
         """Cannot remotely stop NAO TTS currently."""

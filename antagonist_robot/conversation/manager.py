@@ -141,29 +141,42 @@ class ConversationManager:
         )
         return self._session_id
 
-    def run_turn(self) -> Optional[TurnResult]:
-        self._turn_count += 1
-        latency: dict[str, int] = {}
-        
-        # 1. Capture
-        self._set_state(SystemState.LISTENING)
-        self._nao.on_listening()
-        t0 = time.monotonic()
-        audio = self._capture.record_utterance(is_active=lambda: self._running)
-        if audio is None:
-            self._set_state(SystemState.IDLE)
-            return None
-        latency["vad_ms"] = round((time.monotonic() - t0) * 1000)
+    def _is_current(self, session_id: Optional[str]) -> bool:
+        """True while session_id is still the running session.
 
-        # 2. Transcribe
-        self._set_state(SystemState.PROCESSING)
-        t1 = time.monotonic()
-        asr_result = self._asr.transcribe(audio)
-        latency["asr_ms"] = round((time.monotonic() - t1) * 1000)
+        A turn started in a previous session must not keep recording, or
+        speak and log into the session that replaced it.
+        """
+        return self._running and self._session_id == session_id
+
+    def run_turn(self) -> Optional[TurnResult]:
+        session_id = self._session_id
+        latency: dict[str, int] = {}
+
+        # 1-2. Capture and transcribe; keep listening if Whisper hears nothing
+        while True:
+            self._set_state(SystemState.LISTENING)
+            self._nao.on_listening()
+            t0 = time.monotonic()
+            audio = self._capture.record_utterance(is_active=lambda: self._is_current(session_id))
+            if audio is None:
+                self._set_state(SystemState.IDLE)
+                return None
+            latency["vad_ms"] = round((time.monotonic() - t0) * 1000)
+
+            self._set_state(SystemState.PROCESSING)
+            t1 = time.monotonic()
+            asr_result = self._asr.transcribe(audio)
+            latency["asr_ms"] = round((time.monotonic() - t1) * 1000)
+            if asr_result.text.strip():
+                break
+            logging.getLogger(__name__).info("Empty transcript, listening again")
+
+        self._turn_count += 1
 
         # 3. LLM Generate
         system_prompt = self._avct.get_system_prompt(
-            self._session_id, self._polar_level, self._category, self._subtype, self._modifiers
+            session_id, self._polar_level, self._category, self._subtype, self._modifiers
         )
         self._history.add_user_message(asr_result.text)
 
@@ -184,6 +197,9 @@ class ConversationManager:
             self._end_requested = True
 
         risk_rating = self._avct.get_risk_rating(self._polar_level, self._category, self._subtype, self._modifiers)
+
+        if not self._is_current(session_id):
+            return None
 
         # 4. Synthesize (using cleaned text — [END] token never reaches TTS)
         self._set_state(SystemState.SPEAKING)
@@ -222,7 +238,7 @@ class ConversationManager:
         )
 
         self._logger.log_turn(
-            session_id=self._session_id,
+            session_id=session_id,
             turn=turn_result,
             asr_result=asr_result,
             llm_result=llm_result,

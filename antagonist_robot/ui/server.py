@@ -118,18 +118,27 @@ def create_app(
     async def on_startup():
         ws_manager.set_event_loop(asyncio.get_event_loop())
 
+    if static_dir and (static_dir / "index.html").exists():
+        logger.info("Serving React UI from %s", static_dir)
+    else:
+        logger.info("React build not found; serving fallback UI (build with: cd webui && npm run build)")
+
     if static_dir and (static_dir / "static").exists():
         app.mount("/static", StaticFiles(directory=str(static_dir / "static")), name="static")
 
     # --- Static files ---
 
+    fallback_index = Path(__file__).parent / "static" / "index.html"
+
     @app.get("/")
     async def serve_index():
-        """Serve the main HTML page."""
+        """Serve the React build if present, otherwise the bundled fallback UI."""
         if static_dir:
             index_path = static_dir / "index.html"
             if index_path.exists():
                 return FileResponse(str(index_path))
+        if fallback_index.exists():
+            return FileResponse(str(fallback_index))
         return JSONResponse(
             {"error": "Frontend not found"},
             status_code=404,
@@ -155,9 +164,9 @@ def create_app(
         Launches the conversation loop in a background thread.
         """
         with _thread_lock:
-            # Stop any previous session/thread
+            # End any previous session so its end_time is recorded
             if manager.is_running:
-                manager.stop()
+                manager.end_session()
 
             # Wait briefly for old thread to notice the stop
             old_thread = _conversation_thread["thread"]

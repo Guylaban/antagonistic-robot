@@ -54,7 +54,7 @@ class TTSConfig:
 class NAOConfig:
     """NAO robot connection settings."""
     mode: str = "real"
-    ip: str = ""
+    ip: str = "nao.local"
     port: int = 9600
     naoqi_port: int = 9559
     password: str = "nao"
@@ -140,7 +140,7 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
 
     # Resolve TTS API key from environment
     tts.api_key = os.environ.get(tts.api_key_env, "")
-    if not tts.api_key:
+    if not tts.api_key and not nao.use_builtin_tts:
         raise ValueError(
             f"TTS API key environment variable '{tts.api_key_env}' is not set. "
             f"Set it with: export {tts.api_key_env}=your-key-here"

@@ -11,6 +11,7 @@ Usage:
 
 import argparse
 import logging
+import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -77,10 +78,18 @@ def main():
         use_builtin_tts=config.nao.use_builtin_tts,
     )
     nao_adapter = RealNAO(
-        config.nao.ip, config.nao.naoqi_port, config.nao.password
+        config.nao.ip, config.nao.port, config.nao.naoqi_port, config.nao.password
     )
 
     nao_adapter.connect()
+    if not nao_adapter.is_connected():
+        print(
+            f"\n  ERROR: NAO speaker server not reachable at "
+            f"{config.nao.ip}:{config.nao.port}.\n"
+            f"  Start nao_speaker_server.py on the robot and check nao.ip "
+            f"in config.yaml."
+        )
+        sys.exit(1)
 
     # Logger
     from antagonist_robot.logging.session_logger import SessionLogger

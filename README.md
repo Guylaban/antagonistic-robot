@@ -5,7 +5,7 @@
 
 > An AVCT-based voice conversation system for human-robot interaction research.
 
-Antagonistic Robot is a turn-based voice conversation system designed for HRI (Human-Robot Interaction) research. It uses the AVCT (Adaptive Voice Conversation Tuning) matrix to parametrically control an LLM's antagonistic behavior across four dimensions: polarity, behavioral category, intensity subtype, and behavioral modifiers. A participant speaks into the NAO robot's microphone, the system transcribes their speech, generates a behaviorally-controlled response via LLM, converts it to speech, and plays it through the NAO robot's speakers. All sessions are logged to an SQLite database for post-experiment analysis. This system was developed for a ROMAN 2026 paper submission.
+Antagonistic Robot is a turn-based voice conversation system designed for HRI (Human-Robot Interaction) research. It uses the AVCT (Adaptive Voice Conversation Tuning) matrix to parametrically control an LLM's antagonistic behavior across four dimensions: polarity, behavioral category, intensity subtype, and behavioral modifiers. A participant speaks into the laptop's microphone (the default input device; the NAO's own microphones are not used), the system transcribes their speech, generates a behaviorally-controlled response via LLM, converts it to speech, and plays it through the NAO robot's speakers. All sessions are logged to an SQLite database for post-experiment analysis. This system was developed for a ROMAN 2026 paper submission.
 
 ## Architecture
 
@@ -75,15 +75,15 @@ All LLM prompts include mandatory, non-removable safety boundaries. These are en
 - Never make threats of physical violence
 - Never use slurs based on race, gender, sexuality, religion, or disability
 - Never provide harmful instructions
-- If the user appears distressed, break character and provide support resources
+- If the user appears distressed, break character and refer them to ERAN (1201, Israel's emotional first aid line) and the researcher
 
 ## Prerequisites
 
 - Python 3.10+
 - A Grok API key (or any OpenAI-compatible LLM API)
 - An OpenAI API key (for TTS)
-- A working microphone
-- (Optional) Node.js 18+ to rebuild the web UI from source
+- A working microphone on the laptop, placed near the participant
+- (Optional) Node.js 18+ to build the React control panel (without it, a built-in fallback UI is served)
 - A NAO robot with `nao_speaker_server.py` deployed
 
 ## Quick Start
@@ -160,7 +160,7 @@ Available voices: alloy, echo, fable, onyx, nova, shimmer, coral, verse, ballad,
 | Setting | Default | Description |
 |---------|---------|-------------|
 | `mode` | `real` | Operating mode (always `real`) |
-| `ip` | *(none)* | NAO robot IP address — must be set by the user |
+| `ip` | `nao.local` | NAO hostname or IP, resolved on every connection |
 | `port` | 9600 | TCP port for `nao_speaker_server.py` |
 | `naoqi_port` | 9559 | NAOqi SDK port |
 | `use_builtin_tts` | `true` | Use NAO's built-in TTS vs local TTS |
@@ -190,7 +190,7 @@ Available voices: alloy, echo, fable, onyx, nova, shimmer, coral, verse, ballad,
 
 ## Web UI
 
-The system serves a React-based web interface at http://localhost:8000. The AVCT Control Panel allows real-time adjustment of all matrix parameters (polar level, category, subtype, modifiers) during active sessions. Changes take effect on the next conversational turn.
+The system serves a React-based web interface at http://localhost:8000. If `webui/build/` does not exist, it serves the self-contained fallback UI in `antagonist_robot/ui/static/index.html` instead, which has the same controls plus session export. The AVCT Control Panel allows real-time adjustment of all matrix parameters (polar level, category, subtype, modifiers) during active sessions. Changes take effect on the next conversational turn.
 
 To rebuild the web UI from source:
 
@@ -202,19 +202,20 @@ npm run build
 
 ## NAO Robot Setup
 
-1. Deploy `nao_speaker_server.py` to the NAO robot via SCP
-2. Start the speaker server on the robot: `python nao_speaker_server.py`
-3. Update `config.yaml`:
+1. Connect the robot (Ethernet cable or the same network) and check it answers: `ping -4 nao.local`
+2. Deploy and start the speaker server on the robot: `python deploy_nao.py`
+   (uploads `nao_speaker_server.py` over SSH using `nao.password`, restarts it, and waits until it is listening; `--log` shows its output, `--stop` stops it)
+3. Run `python main.py`. It exits with an error if the speaker server is not reachable.
+
+`nao.ip` defaults to `nao.local` and is resolved on every connection. On a direct cable the robot's link-local IPv4 address changes between sessions, so avoid hardcoding it. An explicit IP also works.
 
 ```yaml
 nao:
-  mode: "real"
-  ip: "<your-robot-ip>"  # your NAO's IP address
+  ip: "nao.local"
   port: 9600
-  use_builtin_tts: true  # use NAO's built-in TTS for lower latency
+  password: "nao"
+  use_builtin_tts: true  # NAO's built-in TTS; OPENAI_API_KEY is then not required
 ```
-
-4. Run `python main.py`
 
 ## API Reference
 

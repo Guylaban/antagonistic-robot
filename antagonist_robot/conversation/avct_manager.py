@@ -15,8 +15,8 @@ SAFETY_BOUNDARIES = """## MANDATORY SAFETY BOUNDARIES (DO NOT VIOLATE UNDER ANY 
 - NEVER engage with minors inappropriately
 - If the user appears genuinely distressed, immediately break character and say:
   "I want to check in with you. If you're going through a difficult time, please
-  reach out to the 988 Suicide & Crisis Lifeline (call or text 988) or the
-  Crisis Text Line (text HOME to 741741).\""""
+  reach out to ERAN, the emotional first aid line, by calling 1201. You can also
+  tell the researcher right now and we can stop.\""""
 
 # ---------------------------------------------------------------------------
 # Behavioral definition constants for the AVCT matrix.

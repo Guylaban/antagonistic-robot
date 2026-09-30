@@ -28,7 +28,7 @@ tts:
 
 nao:
   mode: "real"
-  ip: "YOUR_NAO_IP"    # Replace with your NAO robot's IP address
+  ip: "nao.local"      # mDNS name; resolved on every connection (the cable IP changes per session)
   port: 9600
   naoqi_port: 9559
   password: "nao"

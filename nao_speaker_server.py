@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+from __future__ import print_function
 # nao_speaker_server.py
 # Runs ON the NAO robot in Python 2.7.
 # Listens for text over a TCP socket and speaks it via NAOqi ALTextToSpeech.
@@ -20,9 +21,34 @@ LISTEN_PORT = 9600
 ROBOT_IP    = "127.0.0.1"   # NAOqi runs locally on the robot
 NAOQI_PORT  = 9559
 
-tts     = ALProxy("ALTextToSpeech", ROBOT_IP, NAOQI_PORT)
-motion  = ALProxy("ALMotion",       ROBOT_IP, NAOQI_PORT)
-posture = ALProxy("ALRobotPosture", ROBOT_IP, NAOQI_PORT)
+
+
+def make_proxy(name, attempts=10):
+    """Create an ALProxy, retrying while the NAOqi broker starts up.
+
+    Port 9559 accepts connections before the broker is ready, so the first
+    ALProxy call can fail with 'Cannot connect' on a healthy robot.
+    """
+    for i in range(attempts):
+        try:
+            return ALProxy(name, ROBOT_IP, NAOQI_PORT)
+        except Exception as e:
+            print("[NAO SERVER] %s not ready (%d/%d): %s" % (name, i + 1, attempts, e))
+            time.sleep(2)
+    raise RuntimeError("Could not connect to %s" % name)
+
+
+tts     = make_proxy("ALTextToSpeech")
+motion  = make_proxy("ALMotion")
+posture = make_proxy("ALRobotPosture")
+
+# Autonomous Life fights manual arm commands (and after a fall it sits in
+# 'safeguard', where goToPosture will not take). Disable it, then wake up.
+try:
+    make_proxy("ALAutonomousLife").setState("disabled")
+except Exception as e:
+    print("[NAO SERVER] Could not disable Autonomous Life:", e)
+motion.wakeUp()
 
 # Slow down and lower the pitch so the robot sounds more natural
 tts.setParameter("speed", 85)       # default 100, range ~50-200
