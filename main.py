@@ -55,19 +55,6 @@ def main():
     print("  RAWR: Robotic Antagonism Workbench for Research")
     print("=" * 58)
 
-    # Participant input: microphone + ASR, or a scripted participant
-    if args.script:
-        from antagonist_robot.pipeline.scripted_input import ScriptedParticipant, load_script
-        participant = ScriptedParticipant(load_script(args.script))
-        capture = asr = participant
-        print(f"  Input: scripted participant ({args.script})")
-    else:
-        from antagonist_robot.pipeline.audio_capture import AudioCapture
-        from antagonist_robot.pipeline.asr import ASREngine
-        print(f"  Loading ASR model ({config.asr.model_size})...")
-        capture = AudioCapture(config.audio)
-        asr = ASREngine(config.asr)
-
     from antagonist_robot.pipeline.llm import LLMEngine
     print(f"  LLM: {config.llm.provider_name} ({config.llm.model})")
     llm = LLMEngine(config.llm)
@@ -97,6 +84,11 @@ def main():
         sys.exit(1)
     if caps.interrupt != "verified":
         print(f"  WARNING: Stop speech is {caps.interrupt} on this robot ({caps.notes}).")
+
+    # Participant input: through the robot (default), the computer mic, or a scripted participant
+    capture, asr, listening = _participant_input(config, args, robot)
+    caps.listening = listening
+    print(f"  Listening: {listening}")
 
     from antagonist_robot.logging.session_logger import SessionLogger
     session_logger = SessionLogger(
@@ -149,6 +141,32 @@ def main():
         import uvicorn
         from antagonist_robot.ui.server import create_app
         uvicorn.run(create_app(manager, session_logger), host=config.server.host, port=config.server.port)
+
+
+def _participant_input(config, args, robot):
+    """Return (capture, asr, description) for how the participant is heard."""
+    if args.script:
+        from antagonist_robot.pipeline.scripted_input import ScriptedParticipant, load_script
+        participant = ScriptedParticipant(load_script(args.script))
+        return participant, participant, f"scripted participant ({args.script})"
+
+    if config.audio.input == "robot":
+        recognizer = robot.recognizer()
+        if recognizer is not None:              # the robot's own speech recognition (Furhat)
+            return recognizer, recognizer, robot.capabilities.listening
+        source = robot.mic_source()
+        if source is None:
+            print(f"\n  ERROR: the {config.robot.backend} backend has no microphone. Use --script, "
+                  f"or set audio.input: computer in config.yaml.")
+            sys.exit(1)
+        name = robot.capabilities.listening
+    else:
+        source, name = None, "computer microphone (audio.input: computer)"
+
+    from antagonist_robot.pipeline.asr import ASREngine
+    from antagonist_robot.pipeline.audio_capture import AudioCapture
+    print(f"  Loading ASR model ({config.asr.model_size})...")
+    return AudioCapture(config.audio, source_factory=source, source_name=name), ASREngine(config.asr), name
 
 
 def _config_snapshot(config, args) -> dict:

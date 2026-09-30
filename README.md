@@ -5,7 +5,7 @@
 
 RAWR is an operator console for running user studies in which a social robot behaves in controlled antagonistic ways, for example dismissive, sarcastic, or confrontational, while a trained researcher keeps control of every word the robot says. It drives SoftBank NAO and Pepper, Furhat, and Reachy Mini through one backend interface.
 
-A participant speaks; the system transcribes the utterance locally, compiles the operator's current behavioral parameters into a natural-language prompt, and asks an LLM for one reply. **The reply is not spoken until it passes the operator review gate.** Two kinds of signals are computed while it is held:
+The participant talks to the robot, and the robot listens and speaks: RAWR hears the participant through the robot's microphones (NAO/Pepper and Reachy Mini: streamed to local speech recognition; Furhat: the robot's own recognizer), compiles the operator's current behavioral parameters into a natural-language prompt, and asks an LLM for one reply. **The reply is not spoken until it passes the operator review gate.** Two kinds of signals are computed while it is held:
 
 - **too harsh?** a deterministic safety scanner, a configuration risk rating, participant distress cues, and an optional psychosocial risk monitor;
 - **too soft?** an optional fidelity monitor (an LLM judge and an offline detector from the RAGE benchmark) that checks whether the reply actually enacts the requested behavior or has been softened.
@@ -19,7 +19,8 @@ The operator sends, tempers (one level milder), intensifies (one level stronger)
 ## How a turn works
 
 ```
-participant speech ─► Silero VAD ─► faster-whisper (local) ─► prompt compiler ─► LLM
+robot microphones ─► Silero VAD ─► faster-whisper (local) ─► prompt compiler ─► LLM
+(Furhat: robot's own ASR ───────────────────────►)
                                                                                    │
   robot backend ◄── operator review gate ◄── safety rating + monitor (too harsh?) ◄┤
   (NAO/Pepper,          │                    fidelity judge + detector (too soft?) ◄┘
@@ -30,7 +31,7 @@ participant speech ─► Silero VAD ─► faster-whisper (local) ─► prompt
                         └─ Hold: cancel auto-send
 ```
 
-The pipeline is sequential; each stage completes before the next starts. Participant audio never leaves the computer (VAD and ASR run locally); transcripts are sent to the configured LLM provider (and, if enabled, the monitor and judge providers).
+The pipeline is sequential; each stage completes before the next starts. The robot's microphone is only streamed while the participant may speak, so the robot's own speech is never transcribed. With NAO/Pepper and Reachy Mini, participant audio goes from the robot to this computer only (VAD and ASR run locally); with Furhat, recognition happens in Furhat's own speech service and no audio reaches RAWR. Transcripts are sent to the configured LLM provider (and, if enabled, the monitor and judge providers). `audio.input: computer` switches to the computer's microphone as a fallback.
 
 ## Operator controls
 
@@ -82,12 +83,12 @@ The console shows requested vs. exhibited behavior and a per-turn fidelity trend
 
 ## Robots
 
-| Backend (`robot.backend`) | Speech | Stop speech (measured, `examples/robot_checks.jsonl`) | Setup |
-|---|---|---|---|
-| `nao` (NAO, Pepper) | robot TTS (`ALTextToSpeech`) via `nao_speaker_server.py` on the robot | effective (mock robot: returned 0.11 s after Stop) | `python deploy_nao.py` |
-| `furhat` | robot TTS via the Furhat Remote API | **not effective on the virtual Furhat** (SDK 2.9.2): RAWR regains control in 0.04 s but the robot finishes the utterance; unverified on a physical Furhat | Remote API skill running (port 54321) |
-| `reachy_mini` | offline computer TTS (SAPI on Windows, espeak-ng on Linux) streamed to the robot speaker in 0.1 s chunks | effective (MuJoCo simulation: returned 0.10 s after Stop) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
-| `text` | printed to the terminal | effective | none |
+| Backend (`robot.backend`) | Listening | Speech | Stop speech (measured, `examples/robot_checks.jsonl`) | Setup |
+|---|---|---|---|---|
+| `nao` (NAO, Pepper) | robot front microphone (`ALAudioDevice`, 16 kHz) streamed by the speaker server (port `nao.port + 1`) to local VAD + ASR; mock robot: transcribed exactly | robot TTS (`ALTextToSpeech`) via `nao_speaker_server.py` on the robot | effective (mock robot: returned 0.11 s after Stop) | `python deploy_nao.py` |
+| `furhat` | the robot's own recognizer (`listen()`, text only; no audio archived); virtual Furhat: returns on silence, speech recognition not tested | robot TTS via the Furhat Remote API | **not effective on the virtual Furhat** (SDK 2.9.2): RAWR regains control in 0.04 s but the robot finishes the utterance; unverified on a physical Furhat | Remote API skill running (port 54321) |
+| `reachy_mini` | robot microphones through the SDK to local VAD + ASR; simulator: frames received (the simulator uses the computer mic) | offline computer TTS (SAPI on Windows, espeak-ng on Linux) streamed to the robot speaker in 0.1 s chunks | effective (MuJoCo simulation: returned 0.10 s after Stop) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
+| `text` | none (use `--script` or `audio.input: computer`) | printed to the terminal | effective | none |
 
 Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows each backend's interrupt status.
 
@@ -101,7 +102,7 @@ Check your own robot before a study: `python tools/robot_smoke_test.py --robot <
 | Python packages | `requirements.txt` (FastAPI, uvicorn, torch ≥ 2.0, silero-vad ≥ 5.1, faster-whisper ≥ 1.1, openai ≥ 1.50, sounddevice, paramiko); `requirements-optional.txt` for Furhat, Reachy Mini, and the fidelity detector. A GPU is optional (faster ASR and detector). |
 | Robot | NAO V6 with NAOqi 2.8 (tested with a mock); Furhat with the Remote API skill (tested with the virtual Furhat of SDK 2.9.2); Reachy Mini (tested in the MuJoCo simulation, reachy-mini 1.11). |
 | LLM | An API key for any OpenAI-compatible endpoint (default: xAI, `grok-4.20-0309-non-reasoning`), or a local server such as Ollama. The judge needs its own key (default OpenAI). |
-| Microphone | The computer's default input device, placed near the participant. |
+| Microphone | The robot's (default). The computer's default input device only with `audio.input: computer`. |
 
 ## Installation
 
@@ -155,7 +156,7 @@ The console binds to `127.0.0.1` by default and has no authentication; do not ex
 
 | Section | Keys |
 |---|---|
-| `audio` | `sample_rate` (16000), `silence_threshold_ms` (700), `min_speech_duration_ms` (300) |
+| `audio` | `input` (`robot` / `computer`), `sample_rate` (16000), `silence_threshold_ms` (700), `min_speech_duration_ms` (300) |
 | `asr` | `model_size` (`base.en`), `device` (`auto`/`cpu`/`cuda`) |
 | `llm` | `base_url`, `model`, `max_tokens` (256), `temperature` (0.9), `api_key_env` |
 | `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (false) |
@@ -240,7 +241,7 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 - On a robot whose Stop speech is not verified (see the Robots table), use Manual review so that no reply is spoken before it is read, and keep replies short.
 - Treat a distress cue as a reason to check in, not to continue; End session stops the robot.
 - Set session length limits in the protocol (the system has none).
-- Tell participants that their words are sent to the LLM provider (and the monitor and judge providers, if enabled); use locally hosted models when data must stay in the lab.
+- Tell participants that their words are sent to the LLM provider (and the monitor and judge providers, if enabled), and, with Furhat, that their speech is recognized by Furhat's speech service; use locally hosted models when data must stay in the lab.
 - Store and share `data/` only under the approved data-management plan.
 
 ## Limitations
@@ -248,7 +249,7 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 - The content scanner is lexical and English-only: it misses insults without flagged words and can flag harmless uses. It supports the operator; it does not replace them.
 - The fidelity judge scores category and intensity, not modifiers; the detector sees only the reply text and is weaker on some model families. Both are advisory evidence for the operator and the manipulation check, not ground truth.
 - Latency depends on the provider: in our dry runs generation took a median of 1.4 s per reply on one evening and 10.4 s on another with the same model; the review window, monitor, and judge add to the pause.
-- Stop speech is not effective on the virtual Furhat; Furhat, NAO, and Reachy Mini were tested with the virtual robot, a mock, and the simulator respectively, not yet with the physical robots.
+- Stop speech is not effective on the virtual Furhat; Furhat, NAO, and Reachy Mini were tested with the virtual robot, a mock, and the simulator respectively, not yet with the physical robots. Listening through the robot was verified end to end only with the mock NAO; NAO's head fans may lower recognition accuracy on the real robot, so check it (and fall back to `audio.input: computer` with a microphone near the participant if needed).
 
 ## Troubleshooting the NAO connection
 
@@ -259,7 +260,7 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 | `deploy_nao.py`: authentication failed | Set `nao.password` in `config.yaml`. |
 | `deploy_nao.py`: naoqi module not found | Find it on the robot (`find / -name naoqi.py 2>/dev/null`) and pass `--pythonpath <folder>`. |
 | `main.py`: speaker server not reachable, or unexpected reply | Run `python deploy_nao.py` (also after updating RAWR: older speaker servers do not answer `__PING__`). |
-| Robot speaks but nobody is heard | The computer's default microphone is used, not the robot's. |
+| Robot speaks but nobody is heard | `deploy_nao.py` again (older speaker servers have no microphone stream); `python deploy_nao.py --log` shows `Microphone stream unavailable` if ALAudioDevice failed. |
 | Robot silent, console shows an error | `python deploy_nao.py --log` shows why; `python deploy_nao.py` restarts it. |
 
 ## License

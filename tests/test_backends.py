@@ -185,3 +185,42 @@ def test_factory_builds_each_backend():
     cfg.robot.backend = "pepper3000"
     with pytest.raises(ValueError):
         create_backend(cfg)
+
+
+def test_furhat_recognizer_skips_silence_and_returns_text():
+    class Listening(FakeFurhat):
+        def __init__(self):
+            super().__init__()
+            self.replies = ["SILENCE", "", "I think we should split it equally"]
+
+        def listen(self, language="en-US"):
+            return SimpleNamespace(success=True, message=self.replies.pop(0))
+    b = FurhatBackend(client=Listening())
+    rec = b.recognizer()
+    audio = rec.record_utterance(lambda: True)
+    assert audio is not None and audio.samples.size == 0            # no raw audio from Furhat
+    assert rec.transcribe(audio).text == "I think we should split it equally"
+    assert "speech recognition" in b.capabilities.listening
+
+
+def test_reachy_mic_source_mixes_to_mono_16k():
+    class Media(FakeMedia):
+        def __init__(self):
+            super().__init__()
+            self.rec = 0
+        def start_recording(self): self.rec += 1
+        def stop_recording(self): self.rec -= 1
+        def get_input_audio_samplerate(self): return 16000
+        def get_audio_sample(self):
+            return np.stack([np.full(800, 0.5, np.float32), np.full(800, 0.1, np.float32)], axis=1)
+    from antagonist_robot.robots.reachy_mini import ReachyMicSource
+    m = Media()
+    with ReachyMicSource(m) as mic:
+        frame = mic.read(512)
+        assert m.rec == 1
+    assert m.rec == 0 and frame.shape == (512,) and np.allclose(frame, 0.3)
+
+
+def test_text_backend_has_no_microphone():
+    b = TextBackend()
+    assert b.mic_source() is None and b.recognizer() is None

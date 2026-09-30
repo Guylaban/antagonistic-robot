@@ -1,6 +1,6 @@
 # RAWR (Antagonistic Robot) — notes for Claude
 
-Operator console for HRI studies with an antagonistic robot: laptop mic → Silero VAD → faster-whisper → LLM (OpenAI-compatible API) → SafetyChecker (+ optional psychosocial monitor) (+ optional fidelity judge/detector) → **operator review gate** → a robot backend (`antagonist_robot/robots/`: `nao` via `nao_speaker_server.py`, `furhat` via the Remote API, `reachy_mini` via its SDK, `text` for dry runs). NAO/Pepper and Furhat speak with the robot's own TTS; Reachy Mini gets offline computer TTS (SAPI/espeak-ng) streamed to its speaker. See README.md for setup and the troubleshooting table.
+Operator console for HRI studies with an antagonistic robot: robot microphones (NAO/Pepper: speaker server streams ALAudioDevice on nao.port+1; Reachy Mini: SDK; Furhat: its own listen() ASR; `audio.input: computer` is only a fallback) → Silero VAD → faster-whisper → LLM (OpenAI-compatible API) → SafetyChecker (+ optional psychosocial monitor) (+ optional fidelity judge/detector) → **operator review gate** → a robot backend (`antagonist_robot/robots/`: `nao` via `nao_speaker_server.py`, `furhat` via the Remote API, `reachy_mini` via its SDK, `text` for dry runs). NAO/Pepper and Furhat speak with the robot's own TTS; Reachy Mini gets offline computer TTS (SAPI/espeak-ng) streamed to its speaker. See README.md for setup and the troubleshooting table.
 
 ## Status (2026-09-30)
 
@@ -45,6 +45,7 @@ The operator console the server serves is the single file `antagonist_robot/ui/s
 - Backend status as of 2026-09-30: NAO tested only against the mock robot; Furhat against the virtual Furhat (SDK 2.9.2, where `say_stop` does NOT cut audio); Reachy Mini in the MuJoCo simulator (`reachy-mini-daemon --sim --headless`, needs `.venv-reachy` on Windows; on Linux reachy-mini needs PyGObject system libs). Run `tools/robot_smoke_test.py` on real hardware and record the result.
 - Reachy's daemon uses port 8000 like the console: run the console with `--port 8090`.
 - The fidelity detector weights (`models/fidelity_detector`, git-ignored, 268 MB) were trained on the lab GPU (`ssh lab`, `~/rawr_train/`) with `tools/train_fidelity_detector.py`. The judge prompt in `conversation/fidelity.py` is the RAGE rubric verbatim: don't edit it.
+- Everything participant-facing goes through the robot (user requirement, 2026-09-30): don't reintroduce the laptop mic or laptop speakers as a default.
 - Don't use pyttsx3 for Reachy speech: repeated `runAndWait()` hangs or writes empty WAVs on Windows.
 
 ## LLM model

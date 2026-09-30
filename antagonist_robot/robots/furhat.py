@@ -2,8 +2,9 @@
 
 Requires the Remote API skill running on the robot or on the virtual
 Furhat of the Furhat SDK (it listens on port 54321). Speech uses the
-robot's own voice (`say`), optional non-verbal cues use Furhat gestures
-and the LED ring.
+robot's own voice (`say`); listening uses the robot's microphones and its
+own speech recognition (`listen`), which returns text only. Optional
+non-verbal cues use Furhat gestures and the LED ring.
 
 Interruption: stop() sends `say_stop` and returns control to RAWR at once,
 so the session never waits on the robot. In our tests with the virtual
@@ -14,11 +15,58 @@ ended), so interruption is reported as "unverified" for this backend.
 
 import logging
 import threading
-from typing import Optional
+import time
+from datetime import datetime, timezone
+from typing import Callable, Optional
 
+import numpy as np
+
+from antagonist_robot.pipeline.types import ASRResult, AudioData
 from antagonist_robot.robots.base import Capabilities, RobotBackend, SpeechCue, expression_key
 
 log = logging.getLogger(__name__)
+
+# listen() returns these instead of user speech
+_NO_SPEECH = {"SILENCE", "INTERRUPTED", "FAILED", ""}
+
+
+class FurhatRecognizer:
+    """Listening through Furhat's own microphones and speech recognition (Remote API listen()).
+
+    Furhat's recognizer runs on the robot's side (a cloud ASR service), so no
+    raw audio reaches RAWR and none is archived; only the transcript is logged.
+    """
+
+    def __init__(self, api: Callable, language: str = "en-US"):
+        self._api = api
+        self._language = language
+        self._text: Optional[str] = None
+
+    def record_utterance(self, is_active: Optional[Callable[[], bool]] = None) -> Optional[AudioData]:
+        is_active = is_active or (lambda: True)
+        while is_active():
+            started = datetime.now(timezone.utc).isoformat()
+            t0 = time.monotonic()
+            try:
+                status = self._api().listen(language=self._language)
+                text = (getattr(status, "message", "") or "").strip()
+            except Exception as e:
+                log.warning("Furhat listen failed: %s", e)
+                time.sleep(0.5)
+                continue
+            if not is_active():
+                return None
+            if text.upper() in _NO_SPEECH:
+                continue
+            self._text = text
+            self._elapsed = time.monotonic() - t0
+            return AudioData(samples=np.zeros(0, dtype=np.float32), sample_rate=16000, duration_seconds=0.0,
+                             recording_started=started, recording_ended=datetime.now(timezone.utc).isoformat())
+        return None
+
+    def transcribe(self, audio: AudioData) -> ASRResult:
+        text, self._text = self._text or "", None
+        return ASRResult(text=text, language=self._language, confidence=0.0, transcription_time_seconds=0.0)
 
 # Gesture per condition (Furhat built-in gesture names); used only when expressions are on.
 DEFAULT_GESTURES = {
@@ -33,9 +81,10 @@ class FurhatBackend(RobotBackend):
     """Furhat robot (physical or virtual) through the Remote API."""
 
     def __init__(self, host: str = "localhost", voice: Optional[str] = None, expressions: bool = False,
-                 gestures: Optional[dict] = None, client=None):
+                 gestures: Optional[dict] = None, client=None, language: str = "en-US"):
         self._host = host
         self._voice = voice
+        self._language = language
         self._expressions = expressions
         self._gestures = {**DEFAULT_GESTURES, **(gestures or {})}
         self._client = client
@@ -43,8 +92,12 @@ class FurhatBackend(RobotBackend):
         self._done = threading.Event()
         self.capabilities = Capabilities(
             robot="Furhat", speech="robot TTS (Furhat voice)", interrupt="unverified", expressions=expressions,
+            listening="robot microphones and Furhat's own (cloud) speech recognition; no audio archived",
             notes="say_stop did not interrupt audio on the virtual Furhat (SDK 2.9.2); verify on your robot",
         )
+
+    def recognizer(self):
+        return FurhatRecognizer(self._api, self._language)
 
     def _api(self):
         if self._client is None:
@@ -119,3 +172,7 @@ class FurhatBackend(RobotBackend):
 
     def on_idle(self) -> None:
         self._led("idle")
+        try:
+            self._api().listen_stop()   # release a pending listen() when the session ends
+        except Exception:
+            pass

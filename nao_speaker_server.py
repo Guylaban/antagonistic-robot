@@ -15,6 +15,12 @@ from __future__ import print_function
 #   __PING__   health check; reply "pong"
 # Each connection is handled in its own thread so that __STOP__ can arrive
 # while the robot is still speaking. Keep this file Python 2.7 compatible.
+#
+# Microphone stream on port 9601 (override: --audio-port N): while a client
+# is connected, the robot's front microphone (ALAudioDevice, 16 kHz mono,
+# signed 16-bit little-endian) is streamed to it, after the header line
+# "RAWRMIC 16000 1 s16le". The PC connects only while the participant may
+# speak, so the robot's own speech is not recorded.
 
 import socket
 import math
@@ -26,6 +32,9 @@ from naoqi import ALProxy
 LISTEN_PORT = 9600
 if "--port" in sys.argv:
     LISTEN_PORT = int(sys.argv[sys.argv.index("--port") + 1])
+AUDIO_PORT = LISTEN_PORT + 1
+if "--audio-port" in sys.argv:
+    AUDIO_PORT = int(sys.argv[sys.argv.index("--audio-port") + 1])
 ROBOT_IP    = "127.0.0.1"   # NAOqi runs locally on the robot
 NAOQI_PORT  = 9559
 
@@ -211,6 +220,107 @@ def handle(conn, addr):
         print("[NAO SERVER] Error:", e)
     finally:
         conn.close()
+
+
+# ------------------------------------------------------------------
+# Microphone stream (ALAudioDevice remote module)
+# ------------------------------------------------------------------
+
+MIC_MODULE_NAME = "RawrMic"
+MIC_HEADER = b"RAWRMIC 16000 1 s16le\n"
+_mic_error = None
+
+try:
+    from naoqi import ALBroker, ALModule
+
+    # A local broker lets ALAudioDevice call back into this process.
+    _mic_broker = ALBroker("rawrMicBroker", "0.0.0.0", 0, ROBOT_IP, NAOQI_PORT)
+
+    class RawrMicModule(ALModule):
+        """Receives microphone buffers from ALAudioDevice and forwards them to clients."""
+
+        def __init__(self, name):
+            ALModule.__init__(self, name)
+            self.clients = []
+            self.lock = threading.Lock()
+            self.audio = make_proxy("ALAudioDevice")
+            # 16 kHz allows one channel only; 3 = front microphone; 0 = not deinterleaved
+            self.audio.setClientPreferences(name, 16000, 3, 0)
+
+        def add(self, conn):
+            with self.lock:
+                self.clients.append(conn)
+                first = len(self.clients) == 1
+            if first:
+                self.audio.subscribe(MIC_MODULE_NAME)
+
+        def remove(self, conn):
+            with self.lock:
+                if conn in self.clients:
+                    self.clients.remove(conn)
+                last = not self.clients
+            if last:
+                try:
+                    self.audio.unsubscribe(MIC_MODULE_NAME)
+                except Exception:
+                    pass
+
+        def processRemote(self, nbOfChannels, nbOfSamplesByChannel, timeStamp, inputBuffer):
+            with self.lock:
+                clients = list(self.clients)
+            for c in clients:
+                try:
+                    c.sendall(inputBuffer)
+                except Exception:
+                    self.remove(c)
+
+    # NAOqi finds the module through a global variable with the module's name.
+    RawrMic = RawrMicModule(MIC_MODULE_NAME)
+except Exception as e:
+    RawrMic = None
+    _mic_error = str(e)
+    print("[NAO SERVER] Microphone stream unavailable:", e)
+
+
+def handle_mic(conn, addr):
+    """Stream the microphone to one client until it disconnects."""
+    try:
+        if RawrMic is None:
+            conn.sendall(("RAWRMIC ERROR %s\n" % _mic_error).encode("utf-8"))
+            return
+        conn.sendall(MIC_HEADER)
+        RawrMic.add(conn)
+        while True:
+            if not conn.recv(64):   # the client closes the connection to stop
+                break
+    except Exception:
+        pass
+    finally:
+        if RawrMic is not None:
+            RawrMic.remove(conn)
+        conn.close()
+
+
+# Bind before the speech port opens, so a successful __PING__ implies the microphone port is ready.
+_mic_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+_mic_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+_mic_sock.bind(("0.0.0.0", AUDIO_PORT))
+_mic_sock.listen(2)
+print("[NAO SERVER] Microphone stream on port", AUDIO_PORT)
+sys.stdout.flush()
+
+
+def mic_server():
+    while True:
+        c, a = _mic_sock.accept()
+        t = threading.Thread(target=handle_mic, args=(c, a))
+        t.daemon = True
+        t.start()
+
+
+_mic_thread = threading.Thread(target=mic_server)
+_mic_thread.daemon = True
+_mic_thread.start()
 
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

@@ -41,3 +41,17 @@ def test_unreachable_robot_fails_loudly():
         pass
     else:
         raise AssertionError("expected RuntimeError")
+
+
+def test_nao_microphone_stream_delivers_robot_audio(mock_robot, mock_mic_wav):
+    import numpy as np
+    from antagonist_robot.robots.nao import NaoMicSource
+    ip, port = mock_robot
+    _, expected = mock_mic_wav
+    with NaoMicSource(ip, port + 1) as mic:
+        got = np.concatenate([mic.read(512) for _ in range(20)])      # 10240 samples, 0.64 s
+    np.testing.assert_allclose(got, expected[:len(got)] / 32768.0, atol=1e-6)
+    # A new connection starts a fresh stream (audio from before listening is never reused)
+    with NaoMicSource(ip, port + 1) as mic:
+        again = mic.read(512)
+    np.testing.assert_allclose(again, expected[:512] / 32768.0, atol=1e-6)

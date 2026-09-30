@@ -6,6 +6,7 @@ audio:
   sample_rate: 16000
   silence_threshold_ms: 700
   min_speech_duration_ms: 300
+  input: "robot"        # "robot": listen through the robot (NAO/Pepper and Reachy Mini mics, Furhat ASR); "computer": the computer mic
 
 asr:
   model_size: "base.en"

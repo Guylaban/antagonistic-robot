@@ -18,6 +18,7 @@ class AudioConfig:
     sample_rate: int = 16000
     silence_threshold_ms: int = 700
     min_speech_duration_ms: int = 300
+    input: str = "robot"                # "robot": the robot's microphones; "computer": the computer's default mic
 
 
 @dataclass
@@ -191,6 +192,9 @@ def load_config(config_path: str = "config.yaml") -> AppConfig:
     furhat = _build_dataclass(FurhatConfig, raw.get("furhat", {}))
     reachy = _build_dataclass(ReachyMiniConfig, raw.get("reachy_mini", {}))
     fidelity = _build_dataclass(FidelityConfig, raw.get("fidelity", {}))
+
+    if audio.input not in ("robot", "computer"):
+        raise ValueError(f"audio.input must be 'robot' or 'computer', got {audio.input!r}")
 
     from antagonist_robot.robots import BACKENDS
     if robot.backend not in BACKENDS:

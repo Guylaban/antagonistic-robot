@@ -62,21 +62,55 @@ def _free_port() -> int:
 
 
 @pytest.fixture(scope="session")
-def mock_robot():
-    """Start tools/mock_nao.py on a free port; yield (ip, port)."""
-    port = _free_port()
-    proc = subprocess.Popen(
-        [sys.executable, str(ROOT / "tools" / "mock_nao.py"), "--port", str(port)],
-        stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=str(ROOT),
-    )
-    out = NAOAudioOutput("127.0.0.1", port)
-    for _ in range(100):
-        if out.ping():
+def mock_mic_wav(tmp_path_factory):
+    """A 16 kHz mono WAV the mock robot's microphone 'hears': a 2 s sweep with a known waveform."""
+    import wave
+    import numpy as np
+    path = tmp_path_factory.mktemp("mic") / "mic.wav"
+    t = np.arange(32000) / 16000
+    samples = (0.3 * np.sin(2 * np.pi * (200 + 300 * t) * t) * 32767).astype("<i2")
+    with wave.open(str(path), "wb") as w:
+        w.setnchannels(1)
+        w.setsampwidth(2)
+        w.setframerate(16000)
+        w.writeframes(samples.tobytes())
+    return path, samples
+
+
+@pytest.fixture(scope="session")
+def mock_robot(mock_mic_wav):
+    """Start tools/mock_nao.py on free ports (speech: port, microphone: port + 1); yield (ip, port).
+
+    Windows can refuse a port on 0.0.0.0 that looked free on 127.0.0.1 (reserved
+    ranges), so ports are checked on 0.0.0.0 and the start is retried on new
+    ports if the mock exits.
+    """
+    env = {**os.environ, "RAWR_FAKE_MIC_WAV": str(mock_mic_wav[0])}
+    log = str(mock_mic_wav[0]) + ".mock.log"
+    for _attempt in range(10):
+        port = _free_port()
+        try:
+            for p in (port, port + 1):
+                with socket.socket() as s:
+                    s.bind(("0.0.0.0", p))
+        except OSError:
+            continue
+        # output to a file: an unread pipe would eventually block the mock robot
+        proc = subprocess.Popen(
+            [sys.executable, str(ROOT / "tools" / "mock_nao.py"), "--port", str(port)],
+            stdout=subprocess.DEVNULL, stderr=open(log, "w"), cwd=str(ROOT), env=env,
+        )
+        out = NAOAudioOutput("127.0.0.1", port)
+        deadline = time.monotonic() + 20
+        while time.monotonic() < deadline and proc.poll() is None:
+            if out.ping():
+                break
+            time.sleep(0.05)
+        if proc.poll() is None and out.ping():
             break
-        time.sleep(0.05)
-    else:
         proc.kill()
-        raise RuntimeError("mock robot did not start")
+    else:
+        raise RuntimeError(f"mock robot did not start (see {log})")
     yield "127.0.0.1", port
     proc.terminate()
     proc.wait(timeout=5)

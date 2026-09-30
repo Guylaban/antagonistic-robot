@@ -16,7 +16,8 @@ class TextBackend(RobotBackend):
         self._spw = seconds_per_word
         self._stop = threading.Event()
         self.capabilities = Capabilities(robot="none (text)", speech="printed to the terminal",
-                                         interrupt="verified", expressions=False)
+                                         interrupt="verified", expressions=False,
+                                         listening="none (use --script, or audio.input: computer)")
 
     def connect(self) -> None:
         pass

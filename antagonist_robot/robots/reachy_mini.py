@@ -3,11 +3,13 @@
 Reachy Mini has no built-in text-to-speech, so replies are synthesized
 offline on the computer (SAPI on Windows, espeak-ng on Linux) and
 streamed to the robot's speaker through the SDK in 0.1 s chunks, which
-makes stop() take effect within one chunk. Optional non-verbal cues use
-head pose and antennas (goto_target).
+makes stop() take effect within one chunk. Listening uses the robot's
+microphones through the SDK (RAWR runs VAD and ASR locally). Optional
+non-verbal cues use head pose and antennas (goto_target).
 
 Works with the physical robot and with the MuJoCo simulation
-(`reachy-mini-daemon --sim`). The daemon's HTTP port defaults to 8000,
+(`reachy-mini-daemon --sim`; the simulation uses the computer's default
+microphone and speaker in place of the robot's). The daemon's HTTP port defaults to 8000,
 the same as RAWR's console, so run the console on another port
 (server.port in config.yaml) when both are on one computer.
 """
@@ -139,6 +141,39 @@ def resample(samples: np.ndarray, sr_in: int, sr_out: int) -> np.ndarray:
     return np.interp(x_out, np.arange(len(samples)), samples).astype(np.float32)
 
 
+class ReachyMicSource:
+    """Reachy Mini's microphones through the SDK (mixed to mono, resampled to 16 kHz)."""
+
+    def __init__(self, media, sample_rate: int = 16000):
+        self._media, self._sr = media, sample_rate
+        self._buf = np.zeros(0, dtype=np.float32)
+
+    def __enter__(self):
+        self._media.start_recording()
+        self._sr_in = self._media.get_input_audio_samplerate()
+        self._buf = np.zeros(0, dtype=np.float32)
+        return self
+
+    def read(self, n: int) -> np.ndarray:
+        deadline = time.monotonic() + 3.0
+        while len(self._buf) < n:
+            chunk = self._media.get_audio_sample()
+            if chunk is None or len(chunk) == 0:
+                if time.monotonic() > deadline:
+                    return np.zeros(n, dtype=np.float32)   # no audio: treat as silence
+                time.sleep(0.01)
+                continue
+            chunk = np.asarray(chunk, dtype=np.float32)
+            mono = chunk.mean(axis=1) if chunk.ndim == 2 else chunk
+            self._buf = np.concatenate([self._buf, resample(mono, self._sr_in, self._sr)])
+        out, self._buf = self._buf[:n], self._buf[n:]
+        return out
+
+    def __exit__(self, *exc):
+        self._media.stop_recording()
+        return False
+
+
 class ReachyMiniBackend(RobotBackend):
     """Reachy Mini (physical or MuJoCo simulation) through the reachy-mini SDK."""
 
@@ -155,8 +190,12 @@ class ReachyMiniBackend(RobotBackend):
         self._playing = False
         self.capabilities = Capabilities(
             robot="Reachy Mini", speech="computer TTS (SAPI / espeak-ng) on robot speaker", interrupt="verified",
-            expressions=expressions, notes="speech streamed in 0.1 s chunks; stop takes effect within one chunk",
+            expressions=expressions, listening="robot microphones through the SDK, to local VAD + ASR",
+            notes="speech streamed in 0.1 s chunks; stop takes effect within one chunk",
         )
+
+    def mic_source(self):
+        return lambda: ReachyMicSource(self._mini.media)
 
     def connect(self) -> None:
         if self._mini is None:
