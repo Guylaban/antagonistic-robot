@@ -4,7 +4,7 @@
 
 ## What This System Is
 
-Antagonistic Robot is a turn-based voice conversation system for HRI (Human-Robot Interaction) research. A participant speaks into the NAO robot's microphone, the system transcribes their speech, sends it to an LLM (Grok 4 Fast) that responds with behavior controlled by the **AVCT matrix**, converts the response to speech (OpenAI TTS), and plays it through the NAO robot's speakers.
+Antagonistic Robot is a turn-based voice conversation system for HRI (Human-Robot Interaction) research. A participant speaks into the laptop's microphone, the system transcribes their speech, sends it to an LLM (Grok, grok-4.20-0309-non-reasoning) that responds with behavior controlled by the **AVCT matrix**, converts the response to speech (OpenAI TTS), and plays it through the NAO robot's speakers.
 
 The AVCT matrix replaces the old 1-5 hostility scale with a multi-dimensional parametric control system.
 
@@ -113,7 +113,7 @@ The web UI is accessible at `http://localhost:8000`.
 
 | Section | Key Settings |
 |---|---|
-| `llm` | `model: grok-4-fast`, `base_url: https://api.x.ai/v1`, `max_tokens: 256`, `temperature: 0.9` |
+| `llm` | `model: grok-4.20-0309-non-reasoning`, `base_url: https://api.x.ai/v1`, `max_tokens: 256`, `temperature: 0.9` |
 | `tts` | `engine: openai`, `model: gpt-4o-mini-tts`, `default_voice: onyx` |
 | `audio` | `sample_rate: 16000`, `silence_threshold_ms: 700` |
 | `nao` | `mode: real`, `ip`, `port` |

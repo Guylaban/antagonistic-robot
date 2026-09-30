@@ -14,7 +14,7 @@ asr:
 llm:
   provider_name: "Grok"
   base_url: "https://api.x.ai/v1"
-  model: "grok-4-fast"
+  model: "grok-4.20-0309-non-reasoning"
   max_tokens: 256
   temperature: 0.9
   api_key_env: "GROK_API_KEY"

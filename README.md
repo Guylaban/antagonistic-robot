@@ -17,7 +17,7 @@ Antagonistic Robot is a turn-based voice conversation system designed for HRI (H
                                   |
                                   | REST / WebSocket
                                   |
-Microphone --> VAD (Silero) --> ASR (faster-whisper) --> LLM (Grok 4 Fast) --> TTS (OpenAI) --> NAO
+Microphone --> VAD (Silero) --> ASR (faster-whisper) --> LLM (Grok) --> NAO built-in TTS
                                                             ^
                                                             |
                                                      AVCT Matrix Control
@@ -148,7 +148,7 @@ All settings are in `config.yaml`. API keys are read from environment variables 
 |---------|---------|-------------|
 | `provider_name` | `Grok` | Display name for the provider |
 | `base_url` | `https://api.x.ai/v1` | API endpoint (any OpenAI-compatible URL) |
-| `model` | `grok-4-fast` | Model name |
+| `model` | `grok-4.20-0309-non-reasoning` | Model name. Use a non-reasoning model: reasoning models add seconds of silence per turn |
 | `max_tokens` | 256 | Maximum response length |
 | `temperature` | 0.9 | Response randomness (0.0--2.0) |
 | `api_key_env` | `GROK_API_KEY` | Environment variable holding the API key |

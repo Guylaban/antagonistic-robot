@@ -1,25 +1,28 @@
+# Upper bounds stop a fresh install from pulling an untested major version
+# (last known-good set: requirements-frozen-2026-09-14.txt on the lab laptop).
+
 # Core framework
-fastapi>=0.115.0
-uvicorn>=0.32.0
-websockets>=13.0
-pyyaml>=6.0
+fastapi>=0.115.0,<1
+uvicorn>=0.32.0,<1
+websockets>=13.0,<17
+pyyaml>=6.0,<7
 
 # Audio
-sounddevice>=0.5.0
-numpy>=2.0.0
+sounddevice>=0.5.0,<1
+numpy>=2.0.0,<3
 
 # VAD + ASR
-torch>=2.0.0
-silero-vad>=5.1
-faster-whisper>=1.1.0
+torch>=2.0.0,<3
+silero-vad>=5.1,<7
+faster-whisper>=1.1.0,<2
 
 # LLM (any OpenAI-compatible API)
-openai>=1.50.0
+openai>=1.50.0,<3
 
 # Utilities
-python-dotenv>=1.0.0
-pydantic>=2.0.0
+python-dotenv>=1.0.0,<2
+pydantic>=2.0.0,<3
 
 # NAO deployment (deploy_nao.py)
-paramiko>=3.5.0
+paramiko>=3.5.0,<5
 # naoqi SDK (not available via pip, install from Aldebaran developer portal)

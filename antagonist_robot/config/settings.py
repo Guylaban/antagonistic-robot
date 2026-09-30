@@ -32,7 +32,7 @@ class LLMConfig:
     """LLM provider settings. Provider-agnostic via OpenAI-compatible API."""
     provider_name: str = "Grok"
     base_url: str = "https://api.x.ai/v1"
-    model: str = "grok-4-fast"
+    model: str = "grok-4.20-0309-non-reasoning"
     max_tokens: int = 256
     temperature: float = 0.9
     api_key_env: str = "GROK_API_KEY"

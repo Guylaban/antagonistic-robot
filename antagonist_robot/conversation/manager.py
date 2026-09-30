@@ -184,7 +184,7 @@ class ConversationManager:
         try:
             llm_result = self._llm.generate(system_prompt, self._history.get_messages())
         except Exception as e:
-            logging.getLogger(__name__).warning("LLM error: %s", e)
+            logging.getLogger(__name__).error("LLM error, speaking fallback line: %s", e)
             llm_result = LLMResult(text="I see. Go on.", model="fallback", total_tokens=0, generation_time_seconds=time.monotonic() - t2)
         latency["llm_ms"] = round((time.monotonic() - t2) * 1000)
 
