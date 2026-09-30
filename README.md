@@ -81,10 +81,11 @@ All LLM prompts include mandatory, non-removable safety boundaries. These are en
 
 - Python 3.10+
 - A Grok API key (or any OpenAI-compatible LLM API)
-- An OpenAI API key (for TTS)
+- (Optional) An OpenAI API key, only if `nao.use_builtin_tts` is set to `false`
 - A working microphone on the laptop, placed near the participant
 - (Optional) Node.js 18+ to build the React control panel (without it, a built-in fallback UI is served)
-- A NAO robot with `nao_speaker_server.py` deployed
+- A NAO robot, powered on and connected to the laptop by Ethernet cable (or on the same network)
+- Internet for the first install and run (torch is ~2 GB; the Whisper model downloads on first start)
 
 ## Quick Start
 
@@ -103,7 +104,13 @@ pip install -r requirements.txt
 
 # Set up API keys
 cp .env.example .env
-# Edit .env and add your GROK_API_KEY and OPENAI_API_KEY
+# Edit .env and add your GROK_API_KEY (OPENAI_API_KEY is not needed with the default config)
+
+# Check the robot is reachable (power on, cable plugged in)
+ping -4 nao.local        # Windows; on Mac/Linux: ping nao.local
+
+# Deploy and start the speaker server on the robot (once per robot boot)
+python deploy_nao.py
 
 # Run with web UI
 python main.py
@@ -113,6 +120,8 @@ python main.py --no-ui
 ```
 
 Open http://localhost:8000 in your browser to access the AVCT Control Panel.
+
+If any step fails, see [Troubleshooting the NAO connection](#troubleshooting-the-nao-connection).
 
 ## Configuration
 
@@ -217,6 +226,19 @@ nao:
   use_builtin_tts: true  # NAO's built-in TTS; OPENAI_API_KEY is then not required
 ```
 
+## Troubleshooting the NAO connection
+
+| Symptom | Cause and fix |
+|---|---|
+| `ping nao.local` finds no host | Robot is off, still booting (~1 min), or not cabled. Press the chest button once: the robot says its IP. Put that IP in `nao.ip` in `config.yaml`. |
+| `ping` works but an old IP stops answering | On a direct cable the robot's `169.254.x.x` address changes between sessions. Keep `nao.ip: "nao.local"` rather than a fixed IP. |
+| `deploy_nao.py`: authentication failed | The robot's SSH password is not `nao`. Set `nao.password` in `config.yaml`. |
+| `deploy_nao.py`: "naoqi module not found on the robot" | The script already tries the standard NAOqi path. Run `ssh nao@nao.local`, then `find / -name "naoqi.py" 2>/dev/null`, and pass the containing folder with `python deploy_nao.py --pythonpath <folder>`. |
+| `deploy_nao.py`: server did not come up | It prints the robot's log. `Cannot connect` right after boot is normal; wait 30s and rerun. `safeguard` or posture errors: put the robot sitting or standing on a flat surface and rerun. |
+| `main.py`: "NAO speaker server not reachable" | Run `python deploy_nao.py` first. It must be rerun after every robot reboot. |
+| Robot speaks but nobody is heard | The laptop's default microphone is used, not NAO's. Check the Windows input device. |
+| Robot is silent and the UI shows an error | The speaker server stopped. `python deploy_nao.py --log` shows why; `python deploy_nao.py` restarts it. |
+
 ## API Reference
 
 | Method | Endpoint | Description |
@@ -242,6 +264,8 @@ antagonistic-robot/
 ├── nao_speaker_server.py            # Runs on the NAO robot
 ├── requirements.txt                 # Python dependencies
 ├── .env.example                     # API key template
+├── deploy_nao.py                    # Deploys + starts the speaker server on the robot (SSH)
+├── CLAUDE.md                        # Lab / robot notes for Claude Code sessions
 │
 ├── antagonist_robot/                # Main Python package
 │   ├── config/

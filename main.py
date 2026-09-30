@@ -86,8 +86,8 @@ def main():
         print(
             f"\n  ERROR: NAO speaker server not reachable at "
             f"{config.nao.ip}:{config.nao.port}.\n"
-            f"  Start nao_speaker_server.py on the robot and check nao.ip "
-            f"in config.yaml."
+            f"  Run: python deploy_nao.py   (starts the speaker server on the robot)\n"
+            f"  If that fails, see 'Troubleshooting the NAO connection' in README.md."
         )
         sys.exit(1)
 

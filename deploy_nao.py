@@ -8,6 +8,7 @@ Usage:
     python deploy_nao.py            # upload + (re)start + verify
     python deploy_nao.py --log      # show the server's log on the robot
     python deploy_nao.py --stop     # stop the server
+    python deploy_nao.py --pythonpath /path/on/robot   # if naoqi is not found
 """
 
 import argparse
@@ -28,6 +29,10 @@ REMOTE_SCRIPT = "/home/nao/nao_speaker_server.py"
 REMOTE_LOG = "/home/nao/nao_speaker_server.log"
 LOCAL_SCRIPT = Path(__file__).parent / "nao_speaker_server.py"
 
+# Where NAOqi's Python module usually lives on the robot, tried if the
+# login shell does not already put it on PYTHONPATH.
+DEFAULT_ROBOT_PYTHONPATHS = ["/opt/aldebaran/lib/python2.7/site-packages"]
+
 
 def load_nao_config(path: str) -> NAOConfig:
     """Load only the nao section, so no API keys are needed to deploy."""
@@ -40,6 +45,25 @@ def run(ssh: paramiko.SSHClient, command: str) -> str:
     """Run a command on the robot and return its combined output."""
     _, stdout, stderr = ssh.exec_command(command)
     return (stdout.read() + stderr.read()).decode("utf-8", "replace").strip()
+
+
+def find_python_env(ssh: paramiko.SSHClient, extra_paths: list) -> str:
+    """Return a shell prefix under which the robot's python can import naoqi.
+
+    Raises SystemExit with instructions if no candidate works.
+    """
+    candidates = [""] + [f"PYTHONPATH={p}:$PYTHONPATH " for p in extra_paths + DEFAULT_ROBOT_PYTHONPATHS]
+    for prefix in candidates:
+        out = run(ssh, f"bash -lc '{prefix}python -c \"import naoqi\" && echo NAOQI_OK'")
+        if "NAOQI_OK" in out:
+            return prefix
+        last_error = out
+    sys.exit(
+        "naoqi module not found on the robot.\n"
+        f"Last error: {last_error}\n"
+        "Find it with: ssh nao@<robot> then: find / -name naoqi.py 2>/dev/null\n"
+        "Then rerun: python deploy_nao.py --pythonpath <folder containing naoqi.py>"
+    )
 
 
 def wait_for_port(ip: str, port: int, timeout: float) -> bool:
@@ -60,6 +84,8 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument("--log", action="store_true", help="print the server log")
     group.add_argument("--stop", action="store_true", help="stop the server")
+    parser.add_argument("--pythonpath", action="append", default=[],
+                        help="extra folder on the robot containing the naoqi module")
     args = parser.parse_args()
 
     nao = load_nao_config(args.config)
@@ -72,7 +98,12 @@ def main():
 
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect(ip, username=SSH_USER, password=nao.password, timeout=10)
+    try:
+        ssh.connect(ip, username=SSH_USER, password=nao.password, timeout=10)
+    except paramiko.AuthenticationException:
+        sys.exit(f"SSH login as '{SSH_USER}' failed: wrong password. Set nao.password in config.yaml.")
+    except (OSError, paramiko.SSHException) as e:
+        sys.exit(f"Cannot SSH to {ip}: {e}\nIs the robot fully booted? Wait a minute and retry.")
     try:
         if args.log:
             print(run(ssh, f"tail -n 50 {REMOTE_LOG}"))
@@ -89,7 +120,8 @@ def main():
         print(f"Uploaded {LOCAL_SCRIPT.name}")
 
         # Login shell so PYTHONPATH includes the robot's naoqi module.
-        run(ssh, f"bash -lc 'nohup python {REMOTE_SCRIPT} > {REMOTE_LOG} 2>&1 &'")
+        env = find_python_env(ssh, args.pythonpath)
+        run(ssh, f"bash -lc '{env}nohup python {REMOTE_SCRIPT} > {REMOTE_LOG} 2>&1 &'")
         print("Starting (standing up and connecting to NAOqi can take ~20s)...")
 
         if wait_for_port(ip, nao.port, timeout=45):

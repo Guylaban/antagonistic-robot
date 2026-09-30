@@ -31,12 +31,10 @@ class AudioCapture:
         self.silence_threshold_ms = config.silence_threshold_ms
         self.min_speech_duration_ms = config.min_speech_duration_ms
 
-        # Load Silero VAD model once
-        self._vad_model, _ = torch.hub.load(
-            repo_or_dir="snakers4/silero-vad",
-            model="silero_vad",
-            trust_repo=True,
-        )
+        # Load Silero VAD model once (bundled with the silero-vad package,
+        # so no download from GitHub is needed at startup)
+        from silero_vad import load_silero_vad
+        self._vad_model = load_silero_vad()
         self._vad_model.eval()
 
         # Frame size for VAD: 512 samples = 32ms at 16kHz
