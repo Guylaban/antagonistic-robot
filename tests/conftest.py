@@ -56,9 +56,10 @@ class NullNAO(NAOAdapter):
 
 
 def _free_port() -> int:
-    with socket.socket() as s:
-        s.bind(("127.0.0.1", 0))
-        return s.getsockname()[1]
+    """A random port outside the OS dynamic range (49152-65535 on Windows), where other
+    programs' outgoing connections can grab a port between our check and the mock's bind."""
+    import random
+    return random.randrange(20000, 40000, 2)
 
 
 @pytest.fixture(scope="session")
