@@ -35,13 +35,19 @@ nao:
 furhat:                 # needs the Remote API skill running on the robot or virtual Furhat (port 54321)
   host: "localhost"
   voice: null           # e.g. "Matthew"; null keeps the robot's current voice
+  tts_engine: "furhat"  # furhat = robot's own voices (lip-synced); kokoro/system = RAWR's audio (lip sync not generated on the virtual Furhat)
+  tts_voice: null       # kokoro voice (e.g. "am_michael") when tts_engine is kokoro
+  audio_host: null      # this computer's address as the robot sees it (null = auto)
+  audio_port: 8095
 
 reachy_mini:            # needs the Reachy Mini daemon (robot, or: reachy-mini-daemon --sim)
   host: "localhost"
   port: 8000            # the daemon's port; run the console on another one (server.port or --port)
   connection_mode: "auto"
-  tts_rate: 175         # offline TTS (SAPI on Windows, espeak-ng on Linux), words per minute
-  tts_voice: null       # substring of an installed voice name
+  tts_engine: "system"  # system = SAPI (Windows) / espeak-ng (Linux); kokoro = neural voice (see robots/tts.py)
+  tts_rate: 175         # words per minute
+  tts_voice: null       # system: substring of an installed voice name; kokoro: e.g. "af_heart"
+  animate: true         # with robot.expressions: continuous speech-driven head and antenna motion
   speech_log_dir: null  # e.g. data/robot_speech: archive each robot utterance as played (WAV + JSONL)
 
 avct:

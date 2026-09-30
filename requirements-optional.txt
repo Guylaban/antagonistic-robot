@@ -8,6 +8,16 @@ furhat-remote-api>=1.0.2
 reachy-mini[mujoco]>=1.11
 # Offline speech for Reachy Mini: SAPI via comtypes on Windows; espeak-ng (system package) on Linux
 comtypes>=1.4; sys_platform == "win32"
+# Neural voice (reachy_mini.tts_engine: kokoro). kokoro 0.9.4 declares Python < 3.13; on 3.13 install it with
+#   pip install --no-deps --ignore-requires-python kokoro==0.9.4 misaki==0.9.4
+# and then the dependencies below (tested on Python 3.13 with torch 2.11 + CUDA 12.8)
+kokoro>=0.9.4; python_version < "3.13"
+loguru; python_version >= "3.13"
+num2words; python_version >= "3.13"
+spacy>=3.8; python_version >= "3.13"
+phonemizer-fork; python_version >= "3.13"
+espeakng-loader; python_version >= "3.13"
+addict; python_version >= "3.13"
 
 # Fidelity detector (fidelity.detector_enabled); torch is already required
 transformers>=4.50,<6

@@ -11,7 +11,7 @@ from antagonist_robot.config.settings import (FurhatConfig, NAOConfig, ReachyMin
 from antagonist_robot.robots import create_backend
 from antagonist_robot.robots.base import SpeechCue, expression_key
 from antagonist_robot.robots.furhat import FurhatBackend
-from antagonist_robot.robots.reachy_mini import ReachyMiniBackend, resample
+from antagonist_robot.robots.reachy_mini import Animator, DEFAULT_POSES, ReachyMiniBackend, loudness, resample
 from antagonist_robot.robots.text import TextBackend
 
 
@@ -224,3 +224,81 @@ def test_reachy_mic_source_mixes_to_mono_16k():
 def test_text_backend_has_no_microphone():
     b = TextBackend()
     assert b.mic_source() is None and b.recognizer() is None
+
+
+class TwoSentenceTTS:
+    """Streams two 0.5 s sentences; the second arrives 0.4 s after the first has finished playing."""
+
+    def stream(self, text):
+        yield np.full(8000, 0.1, np.float32), 16000
+        time.sleep(0.9)
+        yield np.full(8000, 0.1, np.float32), 16000
+
+
+def test_reachy_streams_sentences_and_archives_gaps(tmp_path):
+    import json
+    import wave
+    b = ReachyMiniBackend(mini=FakeMini(), tts=TwoSentenceTTS(), speech_log_dir=str(tmp_path))
+    assert b.speak("One. Two.") is True
+    rec = json.loads((tmp_path / "speech_log.jsonl").read_text())
+    with wave.open(str(tmp_path / rec["file"])) as w:
+        seconds = w.getnframes() / w.getframerate()
+    assert b._mini.media.pushed == 16000                       # both sentences played
+    assert 1.3 < seconds < 1.6 and rec["interrupted"] is False  # archive keeps the 0.4 s silence in place
+
+
+def test_animator_moves_with_speech_and_condition():
+    a = Animator(mini=None, poses=DEFAULT_POSES)
+    t = 100.0
+
+    def run(seconds):
+        nonlocal t
+        out = []
+        for _ in range(int(seconds * 50)):
+            t += 0.02
+            out.append(a.tick(t, 0.02))
+        return out
+
+    a.set_state("F", 0.4)
+    a.set_style("F")
+    run(2.0)                                                         # settle into the F pose
+    quiet = run(2.0)                                                 # same pose, not speaking
+    speech = np.sin(np.linspace(0, 2 * np.pi * 400, 16000 * 2)).astype(np.float32)
+    speech *= np.tile(np.r_[np.ones(4000), np.zeros(4000)], 4)       # syllable-like bursts
+    a.feed(speech, 16000, t)
+    loud = run(2.0)
+    pitch_quiet = np.ptp([h[1] for h, _, _ in quiet])
+    pitch_loud = np.ptp([h[1] for h, _, _ in loud])
+    assert pitch_loud > 2 * pitch_quiet                              # nods with its own speech
+    assert np.mean([ant[0] for _, _, ant in loud[-25:]]) < -20      # antennas back for condition F
+    assert all(abs(h[0]) <= 20 and abs(h[1]) <= 20 for h, _, _ in loud)
+
+
+def test_loudness_scale():
+    assert loudness(np.zeros(1600, np.float32), 16000).max() == 0
+    assert loudness(np.full(1600, 0.3, np.float32), 16000).min() == 1
+
+
+class UrlFurhat(FakeFurhat):
+    def say(self, text=None, url=None, lipsync=False, blocking=True):
+        import urllib.request
+        data = urllib.request.urlopen(url).read() if url else None
+        self.calls.append(("say", text, url is not None, lipsync, len(data or b"")))
+
+
+def test_furhat_plays_rawr_audio_with_lipsync(tmp_path):
+    f = UrlFurhat(say_s=0.0)
+    b = FurhatBackend(client=f, tts_engine="kokoro", tts=TwoSentenceTTS(), audio_port=18095,
+                      speech_log_dir=str(tmp_path))
+    b.connect()
+    assert b.speak("One. Two.") is True
+    says = [c for c in f.calls if c[0] == "say"]
+    assert len(says) == 2 and all(c[2] and c[3] and c[4] > 16000 for c in says)   # WAV fetched by URL, lip-synced
+    assert len((tmp_path / "speech_log.jsonl").read_text().splitlines()) == 2
+    b._audio.close()
+
+
+def test_furhat_plays_gesture_sequence_through_reply():
+    f = FakeFurhat(say_s=5.3)
+    FurhatBackend(client=f, expressions=True).speak("x", SpeechCue(2, "F"))
+    assert [c[1] for c in f.calls if c[0] == "gesture"] == ["ExpressAnger", "BrowFrown", "Shake"]

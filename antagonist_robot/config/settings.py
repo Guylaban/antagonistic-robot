@@ -62,6 +62,12 @@ class FurhatConfig:
     """Furhat Remote API (robot or virtual Furhat, port 54321)."""
     host: str = "localhost"
     voice: Optional[str] = None
+    tts_engine: str = "furhat"          # furhat (robot's own voice) | kokoro | system: audio from RAWR, lip-synced
+    tts_voice: Optional[str] = None     # voice for kokoro/system, e.g. "am_michael"
+    tts_rate: Optional[int] = None      # words per minute for kokoro/system (175 = normal)
+    audio_host: Optional[str] = None    # address of this computer as the robot sees it (default: auto)
+    audio_port: int = 8095              # port on which RAWR serves the audio to the robot
+    speech_log_dir: Optional[str] = None  # kokoro/system only: archive each utterance as played (WAV + JSONL)
 
 
 @dataclass
@@ -70,8 +76,11 @@ class ReachyMiniConfig:
     host: str = "localhost"
     port: int = 8000
     connection_mode: str = "auto"       # auto | localhost_only | network
+    tts_engine: str = "system"          # system (SAPI / espeak-ng) | kokoro (neural, GPU if available)
     tts_rate: Optional[int] = 175       # words per minute for the offline TTS
-    tts_voice: Optional[str] = None     # substring of an installed voice name
+    tts_voice: Optional[str] = None     # system: substring of an installed voice name; kokoro: e.g. "af_heart"
+    tts_device: str = "auto"            # kokoro: auto | cuda | cpu
+    animate: bool = True                # with robot.expressions: continuous speech-driven motion
     speech_log_dir: Optional[str] = None  # if set, archive each robot utterance as played (WAV + JSONL)
 
 

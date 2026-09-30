@@ -86,13 +86,13 @@ The console shows requested vs. exhibited behavior and a per-turn fidelity trend
 | Backend (`robot.backend`) | Listening | Speech | Stop speech (measured, `examples/robot_checks.jsonl`) | Setup |
 |---|---|---|---|---|
 | `nao` (NAO, Pepper) | robot front microphone (`ALAudioDevice`, 16 kHz) streamed by the speaker server (port `nao.port + 1`) to local VAD + ASR; mock robot: transcribed exactly | robot TTS (`ALTextToSpeech`) via `nao_speaker_server.py` on the robot | effective (mock robot: returned 0.11 s after Stop) | `python deploy_nao.py` |
-| `furhat` | the robot's own recognizer (`listen()`, text only; no audio archived); virtual Furhat: returns on silence, speech recognition not tested | robot TTS via the Furhat Remote API | **not effective on the virtual Furhat** (SDK 2.9.2): RAWR regains control in 0.04 s but the robot finishes the utterance; unverified on a physical Furhat | Remote API skill running (port 54321) |
-| `reachy_mini` | robot microphones through the SDK to local VAD + ASR; simulator: frames received (the simulator uses the computer mic) | offline computer TTS (SAPI on Windows, espeak-ng on Linux) streamed to the robot speaker in 0.1 s chunks | effective (MuJoCo simulation: returned 0.10 s after Stop) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
+| `furhat` | the robot's own recognizer (`listen()`, text only; no audio archived); virtual Furhat: returns on silence, speech recognition not tested | robot TTS via the Furhat Remote API (`furhat.voice`, e.g. a neural voice such as `AndrewMultilingualNeural`; lip-synced) | **not effective on the virtual Furhat** (SDK 2.9.2): RAWR regains control in 0.04 s but the robot finishes the utterance; unverified on a physical Furhat | Remote API skill running (port 54321) |
+| `reachy_mini` | robot microphones through the SDK to local VAD + ASR; simulator: frames received (the simulator uses the computer mic) | computer TTS streamed to the robot speaker in 0.1 s chunks, sentence by sentence: `tts_engine: system` (SAPI / espeak-ng) or `kokoro` (Kokoro-82M neural voice, offline, GPU if available; first sentence in about 1 s on an RTX 3050 laptop GPU) | effective (MuJoCo simulation: returned 0.10 s after Stop) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
 | `text` | none (use `--script` or `audio.input: computer`) | printed to the terminal | effective | none |
 
 Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows each backend's interrupt status.
 
-`robot.expressions: true` adds condition-specific non-verbal cues on Furhat (gestures, LED) and Reachy Mini (head pose, antennas). They are off by default so the manipulation stays verbal across robots; the mappings are in `robots/furhat.py` and `robots/reachy_mini.py`.
+`robot.expressions: true` adds condition-specific non-verbal cues. Furhat plays a sequence of built-in gestures through each reply (e.g. Confrontational: BrowFrown, Shake; Sarcastic: BrowRaise, Smile, Roll), looks thoughtful while a reply is prepared, and uses the LED ring. Reachy Mini (with `reachy_mini.animate: true`, the default) moves continuously: it eases into a head and antenna pose per state and condition, breathes and glances while listening, and nods and moves its antennas with the loudness of its own speech, in a style chosen from the condition (sharp beats for Confrontational, asymmetric antennas for Sarcastic, low energy for Dismissive). Cues are off by default so the manipulation stays verbal across robots; the mappings (`DEFAULT_GESTURES`, `DEFAULT_POSES`, `DEFAULT_STYLES`) are in `robots/furhat.py` and `robots/reachy_mini.py`.
 
 ## Requirements
 
@@ -161,8 +161,8 @@ The console binds to `127.0.0.1` by default and has no authentication; do not ex
 | `llm` | `base_url`, `model`, `max_tokens` (256), `temperature` (0.9), `api_key_env` |
 | `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (false) |
 | `nao` | `ip` (`nao.local`, resolved each connection), `port` (9600), `naoqi_port`, `password` |
-| `furhat` | `host` (`localhost`), `voice` |
-| `reachy_mini` | `host`, `port` (8000, the daemon's), `connection_mode`, `tts_rate`, `tts_voice` |
+| `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat`; `kokoro`/`system` play RAWR's audio, but the virtual Furhat did not lip-sync it), `tts_voice`, `audio_host`, `audio_port` (8095) |
+| `reachy_mini` | `host`, `port` (8000, the daemon's), `connection_mode`, `tts_engine` (`system`/`kokoro`), `tts_rate`, `tts_voice` (SAPI voice name, or a Kokoro voice such as `af_heart`), `tts_device`, `animate` (true), `speech_log_dir` |
 | `avct` | default polar level, category, intensity class |
 | `operator` | `review_mode` (`timed`/`manual`), `hold_seconds` (3.0), `block_auto_send_at` (`Orange`), `model_can_end_session` (false) |
 | `monitor` | `enabled` (false), `base_url`, `model`, `api_key_env`, `timeout_s`, `gate_auto_send` (true) |
