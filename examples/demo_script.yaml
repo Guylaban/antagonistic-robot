@@ -1,0 +1,12 @@
+# Scripted participant for dry runs and the demonstration session.
+# Used by: python main.py --script examples/demo_script.yaml
+#          (with python tools/mock_nao.py and --nao-ip 127.0.0.1 for a robot-free dry run)
+# The utterances are a neutral team-planning conversation; the robot's
+# behavior comes entirely from the parameters the operator sets.
+utterances:
+  - "I think the best way to handle the project is to just divide it equally among the team members."
+  - "Well, it seems fair to everyone that way."
+  - "I just think people respond better when things feel equal."
+  - "Okay, so what would you do instead?"
+  - "I guess I could ask everyone what they are best at first."
+  - "Thanks, I think I have enough to go on now."

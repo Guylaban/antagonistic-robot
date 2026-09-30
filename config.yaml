@@ -1,5 +1,5 @@
-# Antagonistic Robot Configuration
-# All settings for the turn-based hostile voice conversation system.
+# RAWR configuration
+# Turn-based spoken interaction with a NAO/Pepper robot under operator review.
 # API keys are read from environment variables (not stored here).
 
 audio:
@@ -14,30 +14,37 @@ asr:
 llm:
   provider_name: "Grok"
   base_url: "https://api.x.ai/v1"
-  model: "grok-4-fast"
+  model: "grok-4.20-0309-non-reasoning"   # pinned snapshot; the "grok-4-fast" alias now resolves to reasoning model grok-4.3
   max_tokens: 256
   temperature: 0.9
   api_key_env: "GROK_API_KEY"
   stream: false
 
-tts:
-  engine: "openai"
-  default_voice: "onyx"
-  model: "gpt-4o-mini-tts"
-  api_key_env: "OPENAI_API_KEY"
-
 nao:
-  mode: "real"
   ip: "nao.local"      # mDNS name; resolved on every connection (the cable IP changes per session)
   port: 9600
   naoqi_port: 9559
   password: "nao"
-  use_builtin_tts: true
 
 avct:
   default_polar_level: 2
   default_category: "D"
   default_subtype: 2
+
+# Operator review gate: every generated response is held before the robot speaks it.
+operator:
+  review_mode: "timed"          # "timed": auto-send after hold_seconds unless blocked; "manual": every response needs Send
+  hold_seconds: 3.0             # review window in timed mode
+  block_auto_send_at: "Orange"  # responses rated Orange or Red always need an explicit Send (or Temper)
+
+# Optional psychosocial monitor (DialogGuard's five dimensions, one LLM call per response).
+monitor:
+  enabled: false
+  base_url: "https://api.x.ai/v1"
+  model: "grok-4.20-0309-non-reasoning"   # pinned snapshot; the "grok-4-fast" alias now resolves to reasoning model grok-4.3
+  api_key_env: "GROK_API_KEY"
+  timeout_s: 20.0
+  gate_auto_send: true   # timed auto-send waits for the scores; a score of 2 or a monitor failure blocks it
 
 logging:
   db_path: "data/Antagonistic Robot.db"
@@ -45,5 +52,5 @@ logging:
   save_audio: true
 
 server:
-  host: "0.0.0.0"
+  host: "127.0.0.1"   # console only on this machine; use 0.0.0.0 only on a trusted network (no authentication)
   port: 8000

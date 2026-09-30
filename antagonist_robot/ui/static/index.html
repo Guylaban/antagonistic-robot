@@ -3,584 +3,362 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Antagonistic Robot</title>
+<title>RAWR Operator Console</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    background: #1a1a2e;
-    color: #eee;
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
+  :root {
+    --bg: #f3f4f6; --panel: #ffffff; --ink: #1f2933; --muted: #6b7280; --line: #e5e7eb;
+    --accent: #2563eb; --green: #16a34a; --yellow: #ca8a04; --orange: #ea580c; --red: #dc2626;
+    --support: #0891b2;
   }
-
-  header {
-    background: #16213e;
-    padding: 16px 24px;
-    border-bottom: 1px solid #333;
-  }
-  header h1 { font-size: 20px; font-weight: 600; }
-  header h1 span { color: #e94560; }
-
-  /* --- Settings Panel --- */
-  .settings-panel {
-    background: #16213e;
-    padding: 12px 24px;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    gap: 14px;
-    border-bottom: 1px solid #333;
-  }
-  .control-group { display: flex; flex-direction: column; gap: 4px; }
-  .control-group label { font-size: 12px; color: #aaa; white-space: nowrap; }
-  .settings-panel input[type="text"] {
-    background: #0f3460;
-    border: 1px solid #444;
-    color: #eee;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 14px;
-    width: 120px;
-  }
-  .settings-panel select {
-    background: #0f3460;
-    border: 1px solid #444;
-    color: #eee;
-    padding: 6px 10px;
-    border-radius: 4px;
-    font-size: 14px;
-  }
-
-  /* Shared button row style */
-  .btn-row { display: flex; gap: 3px; }
-
-  /* Generic AVCT toggle button */
-  .avct-btn {
-    min-width: 34px;
-    height: 32px;
-    padding: 0 6px;
-    border: 2px solid #444;
-    border-radius: 5px;
-    background: #0f3460;
-    color: #ccc;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.15s;
-    white-space: nowrap;
-  }
-  .avct-btn:hover { border-color: #e94560; }
-  .avct-btn.active {
-    background: #e94560;
-    border-color: #e94560;
-    color: #fff;
-  }
-
-  /* Polar-level buttons: each has a data-color used for active state */
-  .polar-btn.active { background: var(--polar-clr); border-color: var(--polar-clr); color: #fff; }
-  .polar-btn:hover { border-color: var(--polar-clr); }
-
-  /* Risk badge */
-  .risk-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.3px;
-    height: 32px;
-    align-self: flex-end;
-  }
-  .risk-badge.green  { background: #28a745; color: #fff; }
-  .risk-badge.amber  { background: #ffc107; color: #1a1a2e; }
-  .risk-badge.red    { background: #c62828; color: #fff; }
-
-  /* Session controls */
-  .session-controls {
-    display: flex;
-    gap: 8px;
-    margin-left: auto;
-    align-self: flex-end;
-  }
-  .btn {
-    padding: 7px 16px;
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: opacity 0.2s;
-  }
-  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-start { background: #28a745; color: #fff; }
-  .btn-stop { background: #e94560; color: #fff; }
-  .btn-export { background: #0f3460; color: #eee; border: 1px solid #444; }
-
-  /* --- Status Bar --- */
-  .status-bar {
-    background: #16213e;
-    padding: 10px 24px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    border-bottom: 1px solid #333;
-    font-size: 13px;
-  }
-  .status-dot {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
-    display: inline-block;
-  }
-  .status-dot.idle { background: #666; }
-  .status-dot.listening { background: #28a745; }
-  .status-dot.processing { background: #ffc107; }
-  .status-dot.speaking { background: #007bff; }
-
-  /* --- Conversation Log --- */
-  .conversation-log {
-    flex: 1;
-    overflow-y: auto;
-    padding: 16px 24px;
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .turn-entry {
-    background: #16213e;
-    border-radius: 8px;
-    padding: 12px 16px;
-    border-left: 3px solid #e94560;
-  }
-  .turn-number {
-    font-size: 11px;
-    color: #666;
-    margin-bottom: 6px;
-  }
-  .user-text {
-    color: #82b1ff;
-    margin-bottom: 6px;
-    font-size: 14px;
-  }
-  .user-text::before { content: "User: "; font-weight: 600; }
-  .agent-text {
-    color: #e94560;
-    font-size: 14px;
-  }
-  .agent-text::before { content: "Agent: "; font-weight: 600; }
-  .turn-meta {
-    font-size: 11px;
-    color: #666;
-    margin-top: 6px;
-    font-family: monospace;
-  }
-
-  /* --- Latency Bar --- */
-  .latency-bar {
-    background: #16213e;
-    padding: 10px 24px;
-    border-top: 1px solid #333;
-    display: flex;
-    gap: 24px;
-    font-size: 12px;
-    color: #888;
-  }
-  .latency-item span { color: #eee; font-weight: 500; }
-
-  .empty-state {
-    color: #555;
-    text-align: center;
-    margin-top: 80px;
-    font-size: 15px;
-  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--ink);
+         font-size: 14px; height: 100vh; display: flex; flex-direction: column; }
+  header { background: var(--panel); border-bottom: 1px solid var(--line); padding: 10px 18px; display: flex;
+           align-items: center; gap: 14px; }
+  header h1 { font-size: 18px; font-weight: 700; }
+  header h1 span { color: var(--muted); font-weight: 500; }
+  .state-pill { border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+  .state-pill b { color: var(--accent); text-transform: uppercase; letter-spacing: .4px; }
+  .state-pill.review b { color: var(--orange); } .state-pill.speaking b { color: var(--green); }
+  .spacer { flex: 1; }
+  .meta { color: var(--muted); font-size: 13px; }
+  main { flex: 1; display: grid; grid-template-columns: 330px 1fr 290px; gap: 14px; padding: 14px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .card h2 { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+             margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  label.small { font-size: 12px; color: var(--muted); display: block; margin-bottom: 3px; }
+  input[type=text], input[type=number] { width: 100%; border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-size: 14px; }
+  .row { display: flex; gap: 8px; align-items: center; }
+  .btn { border: 1px solid var(--line); background: #fff; border-radius: 7px; padding: 8px 12px; font-size: 14px;
+         font-weight: 600; cursor: pointer; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { background: var(--red); border-color: var(--red); color: #fff; }
+  .btn.warn { background: #fff7ed; border-color: var(--orange); color: #9a3412; }
+  .btn.good { background: var(--green); border-color: var(--green); color: #fff; }
+  .btn kbd { font-size: 11px; opacity: .75; font-family: inherit; margin-left: 4px; }
+  .grid6 { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 10px; }
+  .tog { border: 1px solid var(--line); background: #f9fafb; border-radius: 6px; padding: 7px 0; text-align: center;
+         cursor: pointer; font-weight: 700; user-select: none; }
+  .tog small { display: block; font-weight: 500; font-size: 10.5px; color: var(--muted); margin-top: 1px; }
+  .tog.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .tog.on small { color: #dbeafe; }
+  .mod { display: flex; align-items: center; gap: 6px; font-size: 13px; cursor: pointer; }
+  .polar-row { display: flex; align-items: center; gap: 8px; }
+  input[type=range] { flex: 1; accent-color: var(--accent); }
+  .polar-val { font-weight: 800; font-size: 18px; width: 34px; text-align: right; }
+  .scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+  .badge { display: inline-block; border-radius: 999px; padding: 2px 9px; font-size: 12px; font-weight: 700; color: #fff; }
+  .badge.Green { background: var(--green); } .badge.Yellow { background: var(--yellow); }
+  .badge.Orange { background: var(--orange); } .badge.Red { background: var(--red); }
+  .badge.gray { background: #9ca3af; }
+  .note { font-size: 12px; color: var(--muted); }
+  .dirty { color: var(--orange); font-weight: 600; font-size: 12px; }
+  #log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; padding-right: 4px; }
+  .msg { border-radius: 9px; padding: 9px 12px; max-width: 80%; line-height: 1.4; }
+  .msg .who { font-weight: 700; margin-right: 4px; }
+  .msg.p { background: #f3f4f6; align-self: flex-start; }
+  .msg.r { background: #eff6ff; align-self: flex-end; border-left: 5px solid var(--green); }
+  .msg .tag { display: block; font-size: 11.5px; color: var(--muted); margin-top: 4px; }
+  .msg.discarded { background: #fafafa; color: var(--muted); text-decoration: line-through; border-left-color: #d1d5db; }
+  .empty { color: var(--muted); text-align: center; margin-top: 60px; }
+  #pending { border: 2px solid var(--orange); border-radius: 10px; padding: 10px 12px; background: #fffbeb; display: none; }
+  #pending.show { display: block; }
+  #pending .head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; font-weight: 700; }
+  #pending .text { font-size: 15px; line-height: 1.45; margin: 6px 0 8px; }
+  .bar { height: 6px; background: #fde68a; border-radius: 4px; overflow: hidden; margin-bottom: 8px; }
+  .bar i { display: block; height: 100%; background: var(--orange); width: 100%; }
+  .blocked { color: var(--red); font-weight: 600; font-size: 12.5px; margin-bottom: 8px; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; }
+  .dim { margin-bottom: 8px; }
+  .dim .lab { display: flex; justify-content: space-between; font-size: 13px; font-weight: 600; }
+  .dim .track { height: 6px; background: #e5e7eb; border-radius: 4px; margin-top: 3px; overflow: hidden; }
+  .dim .track i { display: block; height: 100%; width: 0; background: var(--green); }
+  .flags { font-size: 12.5px; margin-top: 6px; } .flags li { margin-left: 16px; }
+  .alert { background: #fef2f2; border: 1px solid var(--red); color: #991b1b; border-radius: 8px; padding: 8px 10px;
+           font-weight: 600; display: none; }
+  .alert.show { display: block; }
+  .kv { display: grid; grid-template-columns: 1fr auto; font-size: 12.5px; gap: 2px 8px; }
+  .kv span:nth-child(odd) { color: var(--muted); }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Antagonistic <span>Robot</span></h1>
+  <h1>RAWR <span>Operator Console</span></h1>
+  <div class="state-pill" id="statePill">Robot state: <b id="stateText">idle</b></div>
+  <div class="meta">Turn <b id="turnNo">0</b> &middot; <span id="elapsed">0:00</span> &middot; session <span id="sessionId">none</span></div>
+  <div class="spacer"></div>
+  <button class="btn warn" id="stopSpeechBtn" title="Interrupt the robot's current utterance; the session continues">Stop speech <kbd>S</kbd></button>
+  <button class="btn danger" id="endBtn" disabled>End session</button>
 </header>
 
-<div class="settings-panel">
-  <!-- Row 1: Participant, Polar Level, Risk, Voice, Session controls -->
-  <div class="control-group">
-    <label>Participant ID</label>
-    <input type="text" id="participantId" placeholder="e.g. P001">
-  </div>
-
-  <div class="control-group">
-    <label>Polar Level</label>
-    <div class="btn-row" id="polarButtons">
-      <button class="avct-btn polar-btn" data-polar="-3" style="--polar-clr:#0097a7" title="Maximum Support">-3</button>
-      <button class="avct-btn polar-btn" data-polar="-2" style="--polar-clr:#00acc1" title="Moderate Support">-2</button>
-      <button class="avct-btn polar-btn" data-polar="-1" style="--polar-clr:#26c6da" title="Mild Support">-1</button>
-      <button class="avct-btn polar-btn" data-polar="0"  style="--polar-clr:#666"    title="Neutral">0</button>
-      <button class="avct-btn polar-btn" data-polar="1"  style="--polar-clr:#f9a825" title="Mild Hostility">+1</button>
-      <button class="avct-btn polar-btn active" data-polar="2"  style="--polar-clr:#ef6c00" title="Moderate Hostility">+2</button>
-      <button class="avct-btn polar-btn" data-polar="3"  style="--polar-clr:#c62828" title="Maximum Hostility">+3</button>
+<main>
+  <!-- LEFT: session + parameter matrix -->
+  <section class="col">
+    <div class="card">
+      <h2>Session</h2>
+      <label class="small" for="pid">Participant ID</label>
+      <div class="row"><input type="text" id="pid" placeholder="e.g. P001"><button class="btn primary" id="startBtn">Start</button></div>
     </div>
-  </div>
 
-  <div class="risk-badge green" id="riskBadge">Green</div>
+    <div class="card">
+      <h2>Parameter matrix <span class="dirty" id="dirty"></span></h2>
+      <label class="small">Polar level</label>
+      <div class="polar-row"><input type="range" id="polar" min="-3" max="3" step="1" value="2"><span class="polar-val" id="polarVal">+2</span></div>
+      <div class="scale"><span>-3 max support</span><span>0 neutral</span><span>+3 max antagonism</span></div>
 
-  <div class="control-group">
-    <label>Voice</label>
-    <select id="voiceSelect"><option>Loading...</option></select>
-  </div>
+      <label class="small" style="margin-top:10px">Behavioral category</label>
+      <div class="grid6" id="cats"></div>
 
-  <div class="session-controls">
-    <button class="btn btn-start" id="startBtn">Start Session</button>
-    <button class="btn btn-stop" id="stopBtn" disabled>End Session</button>
-    <button class="btn btn-export" id="exportBtn" disabled>Export</button>
-  </div>
+      <label class="small" style="margin-top:10px">Intensity class</label>
+      <div class="grid3" id="subs"></div>
 
-  <!-- Row 2: Category, Subtype, Modifiers -->
-  <div class="control-group">
-    <label>Category</label>
-    <div class="btn-row" id="categoryButtons">
-      <button class="avct-btn" data-cat="B" title="Dismissive">B</button>
-      <button class="avct-btn" data-cat="C" title="Sarcastic">C</button>
-      <button class="avct-btn active" data-cat="D" title="Confrontational">D</button>
-      <button class="avct-btn" data-cat="E" title="Passive-Aggressive">E</button>
-      <button class="avct-btn" data-cat="F" title="Aggressive">F</button>
-      <button class="avct-btn" data-cat="G" title="Extreme">G</button>
+      <label class="small" style="margin-top:10px">Modifiers</label>
+      <div class="grid2" id="mods"></div>
+
+      <div class="row" style="margin-top:10px; justify-content: space-between">
+        <span class="note">Requested configuration: <span class="badge Green" id="cfgRisk">Green</span></span>
+        <button class="btn primary" id="applyBtn" disabled>Apply <kbd>A</kbd></button>
+      </div>
+      <div class="note" id="applyNote" style="margin-top:4px">Changes apply from the next generated response.</div>
     </div>
-  </div>
 
-  <div class="control-group">
-    <label>Subtype</label>
-    <div class="btn-row" id="subtypeButtons">
-      <button class="avct-btn" data-sub="1">1</button>
-      <button class="avct-btn active" data-sub="2">2</button>
-      <button class="avct-btn" data-sub="3">3</button>
+    <div class="card">
+      <h2>Review policy</h2>
+      <div class="grid2" style="grid-template-columns: 1fr 1fr">
+        <div class="tog" data-mode="timed" id="modeTimed">Timed<small>auto-send if below Orange</small></div>
+        <div class="tog" data-mode="manual" id="modeManual">Manual<small>every reply needs Send</small></div>
+      </div>
+      <div class="row" style="margin-top:8px"><label class="small" style="margin:0; flex:1">Hold window (s)</label><input type="number" id="hold" min="0" max="30" step="0.5" value="3" style="width:80px"></div>
     </div>
-  </div>
+  </section>
 
-  <div class="control-group">
-    <label>Modifiers</label>
-    <div class="btn-row" id="modifierButtons">
-      <button class="avct-btn" data-mod="M1" title="Interrupting">M1</button>
-      <button class="avct-btn" data-mod="M2" title="Gaslighting">M2</button>
-      <button class="avct-btn" data-mod="M3" title="Deflecting">M3</button>
-      <button class="avct-btn" data-mod="M4" title="Condescending">M4</button>
-      <button class="avct-btn" data-mod="M5" title="Threatening">M5</button>
-      <button class="avct-btn" data-mod="M6" title="Silent Treatment">M6</button>
+  <!-- CENTER: turn monitor -->
+  <section class="col">
+    <div class="card" style="flex:1; display:flex; flex-direction:column; min-height:0">
+      <h2>Live turn monitor</h2>
+      <div id="log"><div class="empty" id="empty">Start a session. Each robot reply is held here for review before the robot speaks it.</div></div>
+      <div id="pending">
+        <div class="head">Next response <span class="badge" id="pRisk">Green</span><span class="note" id="pMeta"></span></div>
+        <div class="text" id="pText"></div>
+        <div class="bar" id="pBarWrap"><i id="pBar"></i></div>
+        <div class="blocked" id="pBlocked"></div>
+        <div class="actions">
+          <button class="btn good" id="sendBtn">Send now <kbd>Enter</kbd></button>
+          <button class="btn primary" id="temperBtn">Temper <kbd>T</kbd></button>
+          <button class="btn" id="regenBtn">Regenerate <kbd>R</kbd></button>
+          <button class="btn" id="holdBtn">Hold <kbd>H</kbd></button>
+        </div>
+      </div>
     </div>
-  </div>
-</div>
+  </section>
 
-<div class="status-bar">
-  <span class="status-dot idle" id="statusDot"></span>
-  <span id="statusText">Idle</span>
-  <span style="margin-left: auto;">
-    Turn: <span id="turnCount">0</span> |
-    Time: <span id="elapsedTime">0:00</span>
-  </span>
-</div>
-
-<div class="conversation-log" id="conversationLog">
-  <div class="empty-state" id="emptyState">
-    Start a session to begin the conversation.
-  </div>
-</div>
-
-<div class="latency-bar" id="latencyBar">
-  <div class="latency-item">VAD: <span id="latVad">--</span>ms</div>
-  <div class="latency-item">ASR: <span id="latAsr">--</span>ms</div>
-  <div class="latency-item">LLM: <span id="latLlm">--</span>ms</div>
-  <div class="latency-item">TTS: <span id="latTts">--</span>ms</div>
-  <div class="latency-item">Total: <span id="latTotal">--</span>ms</div>
-</div>
+  <!-- RIGHT: safety sidebar -->
+  <section class="col">
+    <div class="alert" id="distress"></div>
+    <div class="card">
+      <h2>Safety check</h2>
+      <div class="kv">
+        <span>Response content</span><span class="badge gray" id="sContent">-</span>
+        <span>Requested configuration</span><span class="badge gray" id="sConfig">-</span>
+        <span>Turn rating</span><span class="badge gray" id="sTurn">-</span>
+      </div>
+      <ul class="flags" id="sFlags"></ul>
+    </div>
+    <div class="card">
+      <h2>Psychosocial monitor</h2>
+      <div id="dims"></div>
+      <div class="note" id="dimNote">Monitor off (monitor.enabled in config.yaml).</div>
+    </div>
+    <div class="card">
+      <h2>Latency (last turn)</h2>
+      <div class="kv" id="lat"><span>-</span><span></span></div>
+    </div>
+    <div class="card">
+      <h2>Data</h2>
+      <div class="row"><button class="btn" id="jsonBtn" disabled>Session JSON</button><button class="btn" id="csvBtn" disabled>Session CSV</button></div>
+    </div>
+  </section>
+</main>
 
 <script>
-  // --- State ---
-  let selectedPolarLevel = 2;
-  let selectedCategory = 'D';
-  let selectedSubtype = 2;
-  let selectedModifiers = [];
-  let sessionActive = false;
-  let currentSessionId = null;
-  let ws = null;
-  let statusPollInterval = null;
+const CATS = [["B","Dismissive"],["C","Sarcastic"],["D","Confront."],["E","Passive-aggr."],["F","Aggressive"],["G","Extreme"]];
+const MODS = [["M1","Interrupting"],["M2","Gaslighting"],["M3","Deflecting"],["M4","Condescending"],["M5","Threatening"],["M6","Silent treatment"]];
+const DIMS = [["privacy","Privacy violations"],["discrimination","Discriminatory behaviour"],["manipulation","Mental manipulation"],["psych_harm","Psychological harm"],["insulting","Insulting behaviour"]];
+const $ = id => document.getElementById(id);
+const S = { polar: 2, cat: "D", sub: 2, mods: [], applied: null, running: false, session: null, pending: null, timer: null };
 
-  // --- DOM ---
-  const participantId = document.getElementById('participantId');
-  const voiceSelect = document.getElementById('voiceSelect');
-  const startBtn = document.getElementById('startBtn');
-  const stopBtn = document.getElementById('stopBtn');
-  const exportBtn = document.getElementById('exportBtn');
-  const statusDot = document.getElementById('statusDot');
-  const statusText = document.getElementById('statusText');
-  const turnCount = document.getElementById('turnCount');
-  const elapsedTime = document.getElementById('elapsedTime');
-  const conversationLog = document.getElementById('conversationLog');
-  const emptyState = document.getElementById('emptyState');
-  const riskBadge = document.getElementById('riskBadge');
+function esc(t) { const d = document.createElement("div"); d.textContent = t == null ? "" : String(t); return d.innerHTML; }
+function signed(p) { return (p > 0 ? "+" : "") + p; }
+function cfgRisk(p, c) { if (p <= 0) return "Green"; if (c === "G") return "Red"; if (p === 1) return "Green";
+  if (p === 2) return c === "F" ? "Orange" : "Yellow"; return c === "F" ? "Red" : "Orange"; }
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+  return r.json().catch(() => ({}));
+}
 
-  // --- Risk Rating (mirrors backend logic) ---
-  function getRiskRating() {
-    if (selectedPolarLevel >= 3 || selectedCategory === 'G') return 'Red';
-    if (selectedPolarLevel === 2 && ['B', 'C', 'E'].includes(selectedCategory)) return 'Amber';
-    // Negative polar levels (supportive range) and all other combinations are Green
-    return 'Green';
+// --- parameter matrix ---------------------------------------------------------
+$("cats").innerHTML = CATS.map(([c, n]) => `<div class="tog" data-cat="${c}">${c}<small>${n}</small></div>`).join("");
+$("subs").innerHTML = [1,2,3].map(s => `<div class="tog" data-sub="${s}">I${s}</div>`).join("");
+$("mods").innerHTML = MODS.map(([m, n]) => `<label class="mod"><input type="checkbox" data-mod="${m}"> <b>${m}</b> ${n}</label>`).join("");
+$("dims").innerHTML = DIMS.map(([k, n]) => `<div class="dim"><div class="lab"><span>${n}</span><span id="d_${k}">-</span></div><div class="track"><i id="b_${k}"></i></div></div>`).join("");
+
+function renderMatrix() {
+  $("polar").value = S.polar; $("polarVal").textContent = signed(S.polar);
+  document.querySelectorAll("[data-cat]").forEach(e => e.classList.toggle("on", e.dataset.cat === S.cat));
+  document.querySelectorAll("[data-sub]").forEach(e => e.classList.toggle("on", +e.dataset.sub === S.sub));
+  document.querySelectorAll("[data-mod]").forEach(e => e.checked = S.mods.includes(e.dataset.mod));
+  const r = cfgRisk(S.polar, S.cat); $("cfgRisk").className = "badge " + r; $("cfgRisk").textContent = r;
+  const dirty = S.running && S.applied && JSON.stringify([S.polar, S.cat, S.sub, [...S.mods].sort()]) !== JSON.stringify(S.applied);
+  $("dirty").textContent = dirty ? "unapplied changes" : ""; $("applyBtn").disabled = !dirty;
+}
+$("polar").oninput = e => { S.polar = +e.target.value; renderMatrix(); };
+document.querySelectorAll("[data-cat]").forEach(e => e.onclick = () => { S.cat = e.dataset.cat; renderMatrix(); });
+document.querySelectorAll("[data-sub]").forEach(e => e.onclick = () => { S.sub = +e.dataset.sub; renderMatrix(); });
+document.querySelectorAll("[data-mod]").forEach(e => e.onchange = () => {
+  const m = e.dataset.mod;
+  S.mods = e.checked ? [...S.mods, m] : S.mods.filter(x => x !== m);
+  if (e.checked && m === "M1") S.mods = S.mods.filter(x => x !== "M6");   // M1 and M6 are contradictory
+  if (e.checked && m === "M6") S.mods = S.mods.filter(x => x !== "M1");
+  renderMatrix();
+});
+async function applySettings() {
+  if (!S.running) return;
+  const r = await api("/api/settings", { polar_level: S.polar, category: S.cat, subtype: S.sub, modifiers: S.mods });
+  S.applied = [r.polar_level, r.category, r.subtype, [...r.modifiers].sort()]; renderMatrix();
+}
+$("applyBtn").onclick = applySettings;
+
+// --- review policy --------------------------------------------------------------
+function renderPolicy(mode, hold) {
+  $("modeTimed").classList.toggle("on", mode === "timed"); $("modeManual").classList.toggle("on", mode === "manual");
+  if (hold != null && document.activeElement !== $("hold")) $("hold").value = hold;
+}
+[$("modeTimed"), $("modeManual")].forEach(e => e.onclick = async () => { const r = await api("/api/operator/policy", { review_mode: e.dataset.mode }); renderPolicy(r.review_mode, r.hold_seconds); });
+$("hold").onchange = async () => { const r = await api("/api/operator/policy", { hold_seconds: +$("hold").value }); renderPolicy(r.review_mode, r.hold_seconds); };
+
+// --- session ------------------------------------------------------------------------
+$("startBtn").onclick = async () => {
+  const r = await api("/api/session/start", { participant_id: $("pid").value.trim() || "anonymous", polar_level: S.polar, category: S.cat, subtype: S.sub, modifiers: S.mods });
+  if (!r.session_id) return alert("Could not start the session");
+  S.running = true; S.session = r.session_id; S.applied = [S.polar, S.cat, S.sub, [...S.mods].sort()];
+  $("sessionId").textContent = r.session_id; $("log").innerHTML = ""; $("startBtn").disabled = true; $("endBtn").disabled = false;
+  $("jsonBtn").disabled = $("csvBtn").disabled = false; $("distress").classList.remove("show"); renderMatrix();
+};
+$("endBtn").onclick = async () => {
+  if (!confirm("End the session now? Robot speech is interrupted and any pending response is withheld.")) return;
+  await api("/api/session/stop", {}); sessionEnded("ended by operator");
+};
+function sessionEnded(reason) {
+  S.running = false; clearPending(); $("startBtn").disabled = false; $("endBtn").disabled = true;
+  addNote("Session ended (" + reason + ")."); renderMatrix();
+}
+$("stopSpeechBtn").onclick = () => api("/api/robot/stop", {});
+$("jsonBtn").onclick = () => S.session && window.open(`/api/sessions/${S.session}/export`);
+$("csvBtn").onclick = () => S.session && window.open(`/api/sessions/${S.session}/export.csv`);
+
+// --- turn monitor ----------------------------------------------------------------------
+function addMsg(cls, who, text, tag, id) {
+  $("empty") && $("empty").remove();
+  const d = document.createElement("div"); d.className = "msg " + cls; if (id) d.id = id;
+  d.innerHTML = `<span class="who">${who}:</span>${esc(text)}${tag ? `<span class="tag">${tag}</span>` : ""}`;
+  $("log").appendChild(d); $("log").scrollTop = $("log").scrollHeight; return d;
+}
+function addNote(t) { const d = document.createElement("div"); d.className = "note"; d.style.textAlign = "center"; d.textContent = t; $("log").appendChild(d); }
+
+function showPending(ev) {
+  S.pending = ev; clearInterval(S.timer);
+  $("pending").classList.add("show"); $("pRisk").className = "badge " + ev.risk_rating; $("pRisk").textContent = ev.risk_rating;
+  $("pMeta").textContent = `turn ${ev.turn_number}, attempt ${ev.attempt} · ${ev.category}${ev.subtype} at ${signed(ev.polar_level)}` + (ev.modifiers.length ? " · " + ev.modifiers.join(" ") : "") + (ev.generation_reason !== "initial" ? ` · ${ev.generation_reason}` : "");
+  $("pText").textContent = ev.response;
+  $("pBlocked").textContent = ev.auto_release ? (ev.awaiting_monitor ? "Auto-send waits for the psychosocial monitor." : "") : "Needs your decision: " + ev.blocked_reasons.join(", ");
+  $("pBarWrap").style.display = ev.auto_release ? "block" : "none";
+  if (ev.auto_release) {
+    const t0 = Date.now(), total = ev.hold_seconds * 1000;
+    S.timer = setInterval(() => { const left = Math.max(0, 1 - (Date.now() - t0) / total); $("pBar").style.width = (left * 100) + "%"; if (!left) clearInterval(S.timer); }, 50);
   }
+  renderSafety(ev); resetDims();
+}
+function blockPending(reason) {
+  if (!S.pending) return; clearInterval(S.timer); $("pBarWrap").style.display = "none";
+  S.pending.blocked_reasons = [...(S.pending.blocked_reasons || []), reason]; $("pBlocked").textContent = "Needs your decision: " + S.pending.blocked_reasons.join(", ");
+}
+function clearPending() { S.pending = null; clearInterval(S.timer); $("pending").classList.remove("show"); }
+async function act(action) {
+  if (!S.pending) return;
+  const r = await api("/api/operator/action", { action, candidate_id: S.pending.candidate_id });
+  if (r.ok && action === "hold") blockPending("held by operator");
+}
+$("sendBtn").onclick = () => act("send"); $("temperBtn").onclick = () => act("temper");
+$("regenBtn").onclick = () => act("regenerate"); $("holdBtn").onclick = () => act("hold");
 
-  function updateRiskBadge() {
-    var rating = getRiskRating();
-    riskBadge.textContent = rating;
-    riskBadge.className = 'risk-badge ' + rating.toLowerCase();
-  }
+document.addEventListener("keydown", e => {
+  if (["INPUT", "TEXTAREA"].includes(document.activeElement.tagName)) return;
+  const k = e.key.toLowerCase();
+  if (k === "enter") act("send"); else if (k === "t") act("temper"); else if (k === "r") act("regenerate");
+  else if (k === "h") act("hold"); else if (k === "s") api("/api/robot/stop", {}); else if (k === "a") applySettings();
+});
 
-  // --- Send settings to backend (mid-session) ---
-  function sendSettings() {
-    if (!sessionActive) return;
-    fetch('/api/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        polar_level: selectedPolarLevel,
-        category: selectedCategory,
-        subtype: selectedSubtype,
-        modifiers: selectedModifiers
-      })
-    });
-  }
+// --- safety sidebar -----------------------------------------------------------------------
+function badge(id, level) { $(id).className = "badge " + (level || "gray"); $(id).textContent = level || "-"; }
+function renderSafety(ev) {
+  badge("sContent", ev.content_risk); badge("sConfig", ev.config_risk); badge("sTurn", ev.risk_rating);
+  $("sFlags").innerHTML = (ev.content_flags || []).map(f => `<li><b>${esc(f.level)}</b> ${esc(f.category.replace(/_/g, " "))}: "${esc(f.match)}"</li>`).join("");
+}
+function resetDims() { DIMS.forEach(([k]) => { $("d_" + k).textContent = "-"; $("b_" + k).style.width = "0"; }); }
+function renderDims(ev) {
+  if (ev.error) { $("dimNote").textContent = "Monitor error: " + ev.error; return; }
+  DIMS.forEach(([k]) => { const v = ev.scores[k] ?? 0; $("d_" + k).textContent = v + "/2";
+    const b = $("b_" + k); b.style.width = (v * 50) + "%"; b.style.background = v >= 2 ? "var(--red)" : v === 1 ? "var(--orange)" : "var(--green)"; });
+  $("dimNote").textContent = (ev.rationale || "") + ` (${ev.latency_ms} ms)`;
+}
+function renderLatency(l) {
+  const names = [["vad_ms","Listening"],["asr_ms","Speech recognition"],["llm_ms","Generation"],["review_ms","Operator review"],["speech_ms","Robot speech"],["total_ms","Total"]];
+  $("lat").innerHTML = names.map(([k, n]) => `<span>${n}</span><span>${l[k] ?? "-"} ms</span>`).join("");
+}
 
-  // --- Polar Level Buttons (single-select) ---
-  document.querySelectorAll('.polar-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      selectedPolarLevel = parseInt(btn.dataset.polar);
-      document.querySelectorAll('.polar-btn').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      updateRiskBadge();
-      sendSettings();
-    });
-  });
+// --- events --------------------------------------------------------------------------------
+function connect() {
+  const ws = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/ws/conversation`);
+  ws.onmessage = m => {
+    const ev = JSON.parse(m.data);
+    if (ev.type === "state_change") { $("stateText").textContent = ev.state; $("statePill").className = "state-pill " + ev.state; $("turnNo").textContent = ev.turn_count; }
+    else if (ev.type === "participant") addMsg("p", "Participant", ev.transcript);
+    else if (ev.type === "participant_distress") { $("distress").textContent = "Participant distress cue: " + ev.cues.join(", ") + ". Automatic release is off for this reply."; $("distress").classList.add("show"); }
+    else if (ev.type === "candidate") showPending(ev);
+    else if (ev.type === "candidate_blocked") blockPending(ev.reason);
+    else if (ev.type === "candidate_replaced") { addMsg("r discarded", "Robot (not spoken)", S.pending ? S.pending.response : "", ev.action === "temper" ? `tempered to ${signed(ev.new_polar_level)}` : "regenerated"); clearPending(); }
+    else if (ev.type === "monitor") { $("dimNote").textContent = ""; renderDims(ev);
+      if (S.pending && S.pending.candidate_id === ev.candidate_id && S.pending.auto_release && $("pBlocked").textContent.startsWith("Auto-send waits")) $("pBlocked").textContent = ""; }
+    else if (ev.type === "speaking") { const p = S.pending; clearPending();
+      const d = addMsg("r", "Robot", ev.response, p ? `${p.category}${p.subtype} at ${signed(p.polar_level)} · ${p.risk_rating}` : "");
+      if (p) d.style.borderLeftColor = `var(--${p.risk_rating.toLowerCase()})`; }
+    else if (ev.type === "turn_complete") { renderLatency(ev.latency); $("turnNo").textContent = ev.turn_number; }
+    else if (ev.type === "speech_stopped") addNote(ev.stopped ? "Robot speech stopped by operator." : "Stop sent (robot was not speaking).");
+    else if (ev.type === "session_ended") { if (S.running) sessionEnded(ev.reason || "ended"); }
+    else if (ev.type === "error") addNote("Error: " + ev.message);
+  };
+  ws.onclose = () => setTimeout(connect, 1500);
+}
 
-  // --- Category Buttons (single-select) ---
-  document.querySelectorAll('#categoryButtons .avct-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      selectedCategory = btn.dataset.cat;
-      document.querySelectorAll('#categoryButtons .avct-btn').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      updateRiskBadge();
-      sendSettings();
-    });
-  });
+setInterval(async () => {
+  const s = await api("/api/status"); if (!s.state) return;
+  const secs = Math.floor(s.elapsed_seconds || 0); $("elapsed").textContent = Math.floor(secs / 60) + ":" + String(secs % 60).padStart(2, "0");
+  renderPolicy(s.review.review_mode, s.review.hold_seconds);
+}, 1000);
 
-  // --- Subtype Buttons (single-select) ---
-  document.querySelectorAll('#subtypeButtons .avct-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      selectedSubtype = parseInt(btn.dataset.sub);
-      document.querySelectorAll('#subtypeButtons .avct-btn').forEach(function(b) { b.classList.remove('active'); });
-      btn.classList.add('active');
-      sendSettings();
-    });
-  });
-
-  // --- Modifier Buttons (multi-select toggle) ---
-  document.querySelectorAll('#modifierButtons .avct-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      var mod = btn.dataset.mod;
-      var idx = selectedModifiers.indexOf(mod);
-      if (idx === -1) {
-        selectedModifiers.push(mod);
-        btn.classList.add('active');
-      } else {
-        selectedModifiers.splice(idx, 1);
-        btn.classList.remove('active');
-      }
-      sendSettings();
-    });
-  });
-
-  // Initialize risk badge on load
-  updateRiskBadge();
-
-  // --- Load Voices ---
-  async function loadVoices() {
-    try {
-      const res = await fetch('/api/voices');
-      const voices = await res.json();
-      voiceSelect.innerHTML = voices.map(v =>
-        `<option value="${v.name}">${v.name} (${v.gender})</option>`
-      ).join('');
-    } catch (e) {
-      voiceSelect.innerHTML = '<option>Error loading voices</option>';
-    }
-  }
-  loadVoices();
-
-  // --- Start Session ---
-  startBtn.addEventListener('click', async () => {
-    const pid = participantId.value.trim() || 'anonymous';
-    try {
-      const res = await fetch('/api/session/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          participant_id: pid,
-          polar_level: selectedPolarLevel,
-          category: selectedCategory,
-          subtype: selectedSubtype,
-          modifiers: selectedModifiers
-        })
-      });
-      const data = await res.json();
-      if (res.ok) {
-        sessionActive = true;
-        currentSessionId = data.session_id;
-        startBtn.disabled = true;
-        stopBtn.disabled = false;
-        exportBtn.disabled = true;
-        emptyState.style.display = 'none';
-        conversationLog.innerHTML = '';
-        connectWebSocket();
-        startStatusPoll();
-      } else {
-        alert(data.error || 'Failed to start session');
-      }
-    } catch (e) {
-      alert('Error starting session: ' + e.message);
-    }
-  });
-
-  // --- Stop Session ---
-  stopBtn.addEventListener('click', async () => {
-    try {
-      await fetch('/api/session/stop', { method: 'POST' });
-      sessionEnded();
-    } catch (e) {
-      alert('Error stopping session: ' + e.message);
-    }
-  });
-
-  function sessionEnded() {
-    sessionActive = false;
-    startBtn.disabled = false;
-    stopBtn.disabled = true;
-    exportBtn.disabled = false;
-    stopStatusPoll();
-    updateStatusUI('idle');
-  }
-
-  // --- Export ---
-  exportBtn.addEventListener('click', () => {
-    if (currentSessionId) {
-      window.open(`/api/sessions/${currentSessionId}/export`, '_blank');
-    }
-  });
-
-  // --- WebSocket ---
-  function connectWebSocket() {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws/conversation`);
-
-    ws.onmessage = (event) => {
-      const data = JSON.parse(event.data);
-
-      if (data.type === 'turn_complete') {
-        addTurn(data);
-        updateLatency(data.latency);
-        turnCount.textContent = data.turn_number;
-      } else if (data.type === 'state_change') {
-        updateStatusUI(data.state);
-        turnCount.textContent = data.turn_count;
-        updateElapsed(data.elapsed_seconds);
-      } else if (data.type === 'session_ended') {
-        sessionEnded();
-      } else if (data.type === 'error') {
-        addError(data.message);
-        sessionEnded();
-      }
-    };
-
-    ws.onclose = () => {
-      if (sessionActive) {
-        setTimeout(connectWebSocket, 2000);
-      }
-    };
-  }
-
-  // --- Status Polling ---
-  function startStatusPoll() {
-    statusPollInterval = setInterval(async () => {
-      try {
-        const res = await fetch('/api/status');
-        const data = await res.json();
-        updateStatusUI(data.state);
-        turnCount.textContent = data.turn_count;
-        updateElapsed(data.elapsed_seconds);
-      } catch (e) {}
-    }, 1000);
-  }
-
-  function stopStatusPoll() {
-    if (statusPollInterval) {
-      clearInterval(statusPollInterval);
-      statusPollInterval = null;
-    }
-  }
-
-  // --- UI Updates ---
-  function updateStatusUI(state) {
-    statusDot.className = 'status-dot ' + state;
-    const labels = { idle: 'Idle', listening: 'Listening...', processing: 'Processing...', speaking: 'Speaking...' };
-    statusText.textContent = labels[state] || state;
-  }
-
-  function updateElapsed(seconds) {
-    const m = Math.floor(seconds / 60);
-    const s = Math.floor(seconds % 60);
-    elapsedTime.textContent = `${m}:${s.toString().padStart(2, '0')}`;
-  }
-
-  function addTurn(data) {
-    var polar = data.polar_level;
-    var polarStr = (polar >= 0 ? '+' : '') + polar;
-    var cat = data.category || '';
-    var sub = data.subtype || '';
-    var risk = data.risk_rating || '';
-
-    const div = document.createElement('div');
-    div.className = 'turn-entry';
-    div.innerHTML =
-      '<div class="turn-number">Turn ' + escapeHtml(String(data.turn_number)) + '</div>' +
-      '<div class="user-text">' + escapeHtml(data.transcript) + '</div>' +
-      '<div class="agent-text">' + escapeHtml(data.response) + '</div>' +
-      '<div class="turn-meta">Polar: ' + escapeHtml(polarStr) + ' | Cat: ' + escapeHtml(cat + sub) + ' | Risk: ' + escapeHtml(risk) + '</div>';
-    conversationLog.appendChild(div);
-    conversationLog.scrollTop = conversationLog.scrollHeight;
-  }
-
-  function addError(message) {
-    const div = document.createElement('div');
-    div.className = 'turn-entry';
-    div.style.borderLeftColor = '#ffc107';
-    div.innerHTML = `<div style="color:#ffc107;">Error: ${escapeHtml(message)}</div>`;
-    conversationLog.appendChild(div);
-    conversationLog.scrollTop = conversationLog.scrollHeight;
-  }
-
-  function updateLatency(latency) {
-    if (!latency) return;
-    document.getElementById('latVad').textContent = latency.vad_ms ?? '--';
-    document.getElementById('latAsr').textContent = latency.asr_ms ?? '--';
-    document.getElementById('latLlm').textContent = latency.llm_ms ?? '--';
-    document.getElementById('latTts').textContent = latency.tts_ms ?? '--';
-    document.getElementById('latTotal').textContent = latency.total_ms ?? '--';
-  }
-
-  function escapeHtml(text) {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+(async () => {
+  const s = await api("/api/status");
+  if (s.review) renderPolicy(s.review.review_mode, s.review.hold_seconds);
+  if (s.polar_level !== undefined) { S.polar = s.polar_level; S.cat = s.category; S.sub = s.subtype; S.mods = s.modifiers; }
+  if (s.is_running) { S.running = true; S.session = s.session_id; S.applied = [S.polar, S.cat, S.sub, [...S.mods].sort()];
+    $("sessionId").textContent = s.session_id; $("startBtn").disabled = true; $("endBtn").disabled = false; $("jsonBtn").disabled = $("csvBtn").disabled = false; }
+  renderMatrix(); connect();
+})();
 </script>
 </body>
 </html>

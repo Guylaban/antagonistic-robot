@@ -1,1 +1,1 @@
-"""Pipeline components: audio capture, ASR, LLM, TTS, audio output."""
+"""Pipeline components: audio capture, ASR, LLM, robot speech output."""

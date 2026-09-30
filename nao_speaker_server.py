@@ -8,16 +8,24 @@ from __future__ import print_function
 #   ssh nao@<robot_ip>
 #   python nao_speaker_server.py
 #
-# The server listens on port 9600 by default.
-# Your PC sends a line of text, the robot speaks it, then sends back "ok".
+# The server listens on port 9600 by default (override: --port N).
+# Protocol, one newline-terminated UTF-8 line per connection:
+#   <text>     speak it; reply "ok" when done, or "stopped" if interrupted
+#   __STOP__   interrupt ongoing speech now (operator emergency stop); reply "stopped"
+#   __PING__   health check; reply "pong"
+# Each connection is handled in its own thread so that __STOP__ can arrive
+# while the robot is still speaking. Keep this file Python 2.7 compatible.
 
 import socket
 import math
+import sys
 import threading
 import time
 from naoqi import ALProxy
 
 LISTEN_PORT = 9600
+if "--port" in sys.argv:
+    LISTEN_PORT = int(sys.argv[sys.argv.index("--port") + 1])
 ROBOT_IP    = "127.0.0.1"   # NAOqi runs locally on the robot
 NAOQI_PORT  = 9559
 
@@ -39,6 +47,7 @@ def make_proxy(name, attempts=10):
 
 
 tts     = make_proxy("ALTextToSpeech")
+tts_ctl = make_proxy("ALTextToSpeech")   # separate proxy used only to interrupt speech
 motion  = make_proxy("ALMotion")
 posture = make_proxy("ALRobotPosture")
 
@@ -149,33 +158,71 @@ def stop_speaking_pose():
 # ------------------------------------------------------------------
 set_arms(ANGLES_LISTENING, speed=0.1)
 
+_speech_lock = threading.Lock()   # one utterance at a time
+_stop_flag = threading.Event()     # set by __STOP__ while an utterance is playing
+
+
+def read_line(conn):
+    """Read one newline-terminated line from a connection."""
+    data = b""
+    while not data.endswith(b"\n"):
+        chunk = conn.recv(4096)
+        if not chunk:
+            break
+        data += chunk
+    return data.strip().decode("utf-8")
+
+
+def speak(text):
+    """Speak text with the pose cycle. Returns b"stopped" if interrupted."""
+    with _speech_lock:
+        _stop_flag.clear()
+        print("[NAO SERVER] Speaking:", text.encode("utf-8") if sys.version_info[0] < 3 else text)
+        start_speaking_pose()
+        try:
+            tts.say(text.encode("utf-8") if sys.version_info[0] < 3 else text)
+        finally:
+            stop_speaking_pose()
+        return b"stopped" if _stop_flag.is_set() else b"ok"
+
+
+def stop_speech():
+    """Interrupt ongoing and queued speech immediately."""
+    _stop_flag.set()
+    try:
+        tts_ctl.stopAll()
+    except Exception as e:
+        print("[NAO SERVER] stopAll error:", e)
+    print("[NAO SERVER] Speech stopped by operator")
+
+
+def handle(conn, addr):
+    try:
+        line = read_line(conn)
+        if line == "__STOP__":
+            stop_speech()
+            reply = b"stopped"
+        elif line == "__PING__" or not line:
+            reply = b"pong"
+        else:
+            reply = speak(line)
+        conn.sendall(reply + b"\n")
+    except Exception as e:
+        print("[NAO SERVER] Error:", e)
+    finally:
+        conn.close()
+
+
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 server.bind(("0.0.0.0", LISTEN_PORT))
 server.listen(5)
 
 print("[NAO SERVER] Listening on port", LISTEN_PORT)
+sys.stdout.flush()
 
 while True:
     conn, addr = server.accept()
-    print("[NAO SERVER] Connection from", addr)
-    try:
-        data = b""
-        while True:
-            chunk = conn.recv(4096)
-            if not chunk:
-                break
-            data += chunk
-            if data.endswith(b"\n"):
-                break
-        text = data.strip().decode("utf-8").encode("utf-8")
-        if text:
-            print("[NAO SERVER] Speaking:", text)
-            start_speaking_pose()
-            tts.say(text)
-            stop_speaking_pose()
-        conn.sendall(b"ok\n")
-    except Exception as e:
-        print("[NAO SERVER] Error:", e)
-    finally:
-        conn.close()
+    worker = threading.Thread(target=handle, args=(conn, addr))
+    worker.daemon = True
+    worker.start()

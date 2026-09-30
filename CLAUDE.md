@@ -1,10 +1,12 @@
-# Antagonistic Robot — notes for Claude
+# RAWR (Antagonistic Robot) — notes for Claude
 
-Voice conversation system for an HRI study: laptop mic → Silero VAD → faster-whisper → LLM (Grok via OpenAI-compatible API) → text over TCP to `nao_speaker_server.py` on the NAO, which speaks it with NAO's built-in TTS. See README.md for setup and the troubleshooting table.
+Operator console for HRI studies with an antagonistic robot: laptop mic → Silero VAD → faster-whisper → LLM (OpenAI-compatible API) → SafetyChecker (+ optional psychosocial monitor) → **operator review gate** → text over TCP to `nao_speaker_server.py` on the NAO, which speaks it with NAO's built-in TTS. There is no laptop-speaker route. See README.md for setup and the troubleshooting table.
 
 ## Status (2026-09-30)
 
-The NAO connection path (`deploy_nao.py`, `nao.local` resolution, the hardened `nao_speaker_server.py`) was tested only against a fake robot. **The first run on the real NAO has not happened yet.** If something fails there, it is most likely on the robot side; start from `python deploy_nao.py --log`.
+The NAO connection path (`deploy_nao.py`, `nao.local` resolution, the threaded `nao_speaker_server.py` with `__STOP__`/`__PING__`) was tested only against the mock robot (`tools/mock_nao.py`, which runs the real server file with `tools/fake_naoqi`). **The first run on the real NAO has not happened yet.** If something fails there, it is most likely on the robot side; start from `python deploy_nao.py --log`. Check that Stop speech (`tts.stopAll()` from a second proxy while `say()` blocks in another thread) actually interrupts on the robot.
+
+Dry run without the robot: `python tools/mock_nao.py` and `python main.py --nao-ip 127.0.0.1 --script examples/demo_script.yaml`. Offline tests: `python -m pytest tests -q`.
 
 ## Running it
 
@@ -36,10 +38,12 @@ python main.py             # web UI on http://localhost:8000
 
 On the lab laptop the working copy is `Desktop\job\naoqi\NAO_LLM` with a ready `venv`. Its `.exe` console shims (`pip.exe`, `uvicorn.exe`) are broken because the folder was moved; call `venv\Scripts\python.exe -m pip ...` instead. The venv itself works. Don't rebuild it on the phone hotspot (torch is ~2 GB).
 
-`webui/src/App.js` there may have uncommitted UI edits by the repo owner; don't discard them. Without `webui/build/`, the server serves the fallback UI in `antagonist_robot/ui/static/index.html`, which is fully functional.
+The operator console is the single file `antagonist_robot/ui/static/index.html` (no build step). The old React `webui/` was removed on branch `hri27-operator-console`; the lab laptop may still have uncommitted `webui/src/App.js` edits by the repo owner, so don't discard them.
 
 ## Conventions
 
 - Safety boundaries in `avct_manager.py` are always included in every prompt; don't add a code path that skips them.
+- No generated reply may reach the robot without passing `OperatorGate` (`conversation/operator.py`). Every generated reply is logged in `candidates`, spoken or not; reasoning traces go to `reasoning_traces`, never into exports by default.
+- The console binds to 127.0.0.1 by default (no authentication).
 - Every turn is logged to SQLite (`data/`), which holds participant data and is gitignored. Never commit `data/`, `logs/`, or `.env`.
 - Type hints and docstrings on public methods; dataclasses for data passed between pipeline stages.

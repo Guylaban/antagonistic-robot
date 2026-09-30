@@ -64,9 +64,15 @@ class LLMEngine:
         choice = response.choices[0]
         usage = response.usage
 
+        # Some providers (e.g. xAI reasoning models) return a separate
+        # reasoning trace; keep it so it can be stored apart from the response.
+        extra = getattr(choice.message, "model_extra", None) or {}
+        reasoning = getattr(choice.message, "reasoning_content", None) or extra.get("reasoning_content")
+
         return LLMResult(
-            text=choice.message.content.strip(),
+            text=(choice.message.content or "").strip(),
             model=response.model,
             total_tokens=usage.total_tokens if usage else 0,
             generation_time_seconds=elapsed,
+            reasoning=reasoning or None,
         )

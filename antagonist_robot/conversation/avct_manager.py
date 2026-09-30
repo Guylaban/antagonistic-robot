@@ -271,34 +271,16 @@ ANTI_POLAR_DEFINITIONS = {
 
 
 class AvctManager:
-    """Assembles system prompts for AVCT logic and determines risk ratings."""
+    """Assembles system prompts for AVCT logic.
+
+    Risk rating lives in safety.py (config_risk for the parameters,
+    SafetyChecker for the generated text).
+    """
 
     def __init__(self, config: AvctConfig):
         self.default_polar_level = config.default_polar_level
         self.default_category = config.default_category
         self.default_subtype = config.default_subtype
-
-    def get_risk_rating(self, polar_level: int, category: str, subtype: int, modifiers: list) -> str:
-        """Determine ethical risk rating for the Turn Preview.
-
-        Rating logic across the full polar range (-3 to +3):
-          - Negative polar levels (-3 to -1): always Green (supportive sessions are low risk)
-          - Neutral (0): always Green
-          - Positive polar level 1: Green
-          - Positive polar level 2 with category B, C, or E: Amber
-          - Positive polar level 2 with other categories: Green
-          - Positive polar level 3 or category G at any level: Red
-        """
-        # Supportive and neutral range: always low risk
-        if polar_level <= 0:
-            return "Green"
-        # Extreme: category G or maximum antagonistic intensity
-        if polar_level >= 3 or category == "G":
-            return "Red"
-        # Elevated: moderate antagonism with certain categories
-        if polar_level == 2 and category in ("C", "E", "B"):
-            return "Amber"
-        return "Green"
 
     def get_system_prompt(self, session_id: str, polar_level: int, category: str, subtype: int, modifiers: list) -> str:
         """Assemble the 7-slot system prompt for AVCT.

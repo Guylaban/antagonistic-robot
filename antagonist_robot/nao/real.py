@@ -31,19 +31,21 @@ class RealNAO(NAOAdapter):
         self._connected = False
 
     def connect(self) -> None:
-        """Verify the robot is reachable by TCP-pinging the speaker server port.
+        """Verify the speaker server answers a __PING__ on nao.port.
 
-        Attempts a TCP connection to the nao_speaker_server.py port
-        (nao.port in config). If the connection succeeds, the robot is
-        considered reachable; check is_connected() afterwards.
+        Check is_connected() afterwards.
         """
         speaker_port = self._speaker_port
         try:
             ip = resolve_ipv4(self._ip, speaker_port)
             with socket.create_connection(
                 (ip, speaker_port), timeout=5
-            ):
-                pass  # Connection succeeded — robot is reachable
+            ) as s:
+                s.settimeout(5)
+                s.sendall(b"__PING__\n")
+                reply = s.recv(64)
+            if not reply.startswith(b"pong"):
+                raise OSError(f"unexpected reply {reply!r} (is an old nao_speaker_server.py running? rerun deploy_nao.py)")
             self._connected = True
             logger.info(
                 "[RealNAO] Connected — robot reachable at %s (%s):%d",

@@ -1,101 +1,75 @@
-"""Audio output routing to the NAO robot via TCP.
+"""Speech output on the NAO/Pepper robot via nao_speaker_server.py.
 
-NAOAudioOutput: routes audio to NAO robot via nao_speaker_server.py.
+The robot speaks with its own ALTextToSpeech engine. The PC sends text
+over TCP; the speaker server on the robot speaks it and acknowledges.
+
+Protocol (one newline-terminated UTF-8 line per connection):
+    <text>        speak the text; reply "ok" when finished ("stopped" if interrupted)
+    __STOP__      interrupt any ongoing speech immediately; reply "stopped"
+    __PING__      health check; reply "pong" (nothing is spoken)
 """
 
 import socket
-import time
-from abc import ABC, abstractmethod
 
 from antagonist_robot.nao.host import resolve_ipv4
-from antagonist_robot.pipeline.types import TTSResult
+
+STOP_COMMAND = "__STOP__"
+PING_COMMAND = "__PING__"
 
 
-class AudioOutputBase(ABC):
-    """Abstract base class for audio output."""
+class NAOAudioOutput:
+    """Sends robot speech to nao_speaker_server.py and can interrupt it."""
 
-    @abstractmethod
-    def play_audio(self, tts_result: TTSResult) -> None:
-        """Play pre-synthesized audio. Blocks until done."""
-        ...
-
-    @abstractmethod
-    def speak_text(self, text: str) -> None:
-        """Send raw text to a device's built-in TTS. Blocks until done."""
-        ...
-
-    @abstractmethod
-    def stop(self) -> None:
-        """Immediately halt playback."""
-        ...
-
-
-class NAOAudioOutput(AudioOutputBase):
-    """Routes audio to NAO robot.
-
-    Two modes:
-    - use_builtin_tts=True: sends text directly to NAO's ALTextToSpeech
-      via TCP to nao_speaker_server.py (skips local TTS for lower latency).
-    - use_builtin_tts=False: would stream pre-synthesized audio to NAO's
-      ALAudioPlayer (not yet implemented).
-    """
-
-    def __init__(self, ip: str, port: int, use_builtin_tts: bool):
+    def __init__(self, ip: str, port: int, speak_timeout_s: float = 60.0):
         self._ip = ip
         self._port = port
-        self._use_builtin_tts = use_builtin_tts
+        self._speak_timeout_s = speak_timeout_s
 
-    @property
-    def use_builtin_tts(self) -> bool:
-        """Whether this output uses NAO's built-in TTS."""
-        return self._use_builtin_tts
+    def _request(self, line: str, timeout: float) -> bytes:
+        ip = resolve_ipv4(self._ip, self._port)
+        with socket.create_connection((ip, self._port), timeout=timeout) as s:
+            s.settimeout(timeout)
+            s.sendall((line.strip() + "\n").encode("utf-8"))
+            response = b""
+            while not response.endswith(b"\n"):
+                chunk = s.recv(64)
+                if not chunk:
+                    break
+                response += chunk
+        return response.strip()
 
-    def play_audio(self, tts_result: TTSResult) -> None:
-        """Stream pre-synthesized audio to NAO's ALAudioPlayer.
+    def speak_text(self, text: str) -> bool:
+        """Speak text on the robot. Blocks until the robot finishes.
 
-        Not yet implemented — requires naoqi SDK.
-        """
-        raise NotImplementedError(
-            "NAO audio streaming not yet implemented. "
-            "Set use_builtin_tts=true to use NAO's built-in TTS instead."
-        )
-
-    def speak_text(self, text: str) -> None:
-        """Send text to NAO's ALTextToSpeech via TCP.
-
-        Connects to nao_speaker_server.py running on the robot.
-        Protocol: send text + newline, wait for "ok" response.
-        Blocks until the robot finishes speaking.
+        Returns:
+            True if the speech completed, False if it was interrupted by stop().
 
         Raises:
             RuntimeError: if the robot is unreachable or never acknowledges,
                 so the turn fails loudly instead of being logged as spoken.
         """
         try:
-            ip = resolve_ipv4(self._ip, self._port)
-            with socket.create_connection(
-                (ip, self._port), timeout=30
-            ) as s:
-                s.sendall((text.strip() + "\n").encode("utf-8"))
-                # Wait for "ok" acknowledgement from the robot
-                response = b""
-                while True:
-                    chunk = s.recv(64)
-                    if not chunk:
-                        break
-                    response += chunk
-                    if b"ok" in response:
-                        break
+            response = self._request(text, timeout=self._speak_timeout_s)
         except OSError as e:
-            raise RuntimeError(
-                f"NAO speaker server at {self._ip}:{self._port} failed: {e}"
-            ) from e
-        if b"ok" not in response:
-            raise RuntimeError(
-                f"NAO speaker server at {self._ip}:{self._port} closed "
-                f"without acknowledging speech"
-            )
+            raise RuntimeError(f"NAO speaker server at {self._ip}:{self._port} failed: {e}") from e
+        if response == b"ok":
+            return True
+        if response == b"stopped":
+            return False
+        raise RuntimeError(
+            f"NAO speaker server at {self._ip}:{self._port} closed without acknowledging speech"
+        )
 
-    def stop(self) -> None:
-        """Cannot remotely stop NAO TTS currently."""
-        pass
+    def stop(self) -> bool:
+        """Interrupt the robot's speech immediately (operator emergency stop)."""
+        try:
+            return self._request(STOP_COMMAND, timeout=3.0) == b"stopped"
+        except OSError:
+            return False
+
+    def ping(self) -> bool:
+        """True if the speaker server answers."""
+        try:
+            return self._request(PING_COMMAND, timeout=3.0) == b"pong"
+        except OSError:
+            return False

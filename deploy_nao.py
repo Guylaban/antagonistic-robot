@@ -121,7 +121,7 @@ def main():
 
         # Login shell so PYTHONPATH includes the robot's naoqi module.
         env = find_python_env(ssh, args.pythonpath)
-        run(ssh, f"bash -lc '{env}nohup python {REMOTE_SCRIPT} > {REMOTE_LOG} 2>&1 &'")
+        run(ssh, f"bash -lc '{env}nohup python {REMOTE_SCRIPT} --port {nao.port} > {REMOTE_LOG} 2>&1 &'")
         print("Starting (standing up and connecting to NAOqi can take ~20s)...")
 
         if wait_for_port(ip, nao.port, timeout=45):
