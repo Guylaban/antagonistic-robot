@@ -125,6 +125,7 @@ class KokoroTTS:
     """
 
     SR = 24000
+    streams_sentences = True    # stream() yields one part per sentence (split on _SENTENCE)
 
     def __init__(self, voice: Optional[str] = "af_heart", rate: Optional[int] = None, device: str = "auto",
                  sentence_pause_s: float = 0.12):

@@ -122,8 +122,9 @@ class FakeMini:
     def __init__(self):
         self.media, self.poses = FakeMedia(), []
 
-    def goto_target(self, head=None, antennas=None, duration=0.5):
+    def goto_target(self, head=None, antennas=None, duration=0.5, body_yaw=0.0):
         self.poses.append((np.round(antennas, 3).tolist(), duration))
+        self.body_yaws = getattr(self, "body_yaws", []) + [body_yaw]
 
 
 class FakeTTS:
@@ -267,11 +268,11 @@ def test_animator_moves_with_speech_and_condition():
     speech *= np.tile(np.r_[np.ones(4000), np.zeros(4000)], 4)       # syllable-like bursts
     a.feed(speech, 16000, t)
     loud = run(2.0)
-    pitch_quiet = np.ptp([h[1] for h, _, _ in quiet])
-    pitch_loud = np.ptp([h[1] for h, _, _ in loud])
+    pitch_quiet = np.ptp([h[1] for h, *_ in quiet])
+    pitch_loud = np.ptp([h[1] for h, *_ in loud])
     assert pitch_loud > 2 * pitch_quiet                              # nods with its own speech
-    assert np.mean([ant[0] for _, _, ant in loud[-25:]]) < -20      # antennas back for condition F
-    assert all(abs(h[0]) <= 20 and abs(h[1]) <= 20 for h, _, _ in loud)
+    assert np.mean([ant[0] for _, _, ant, *_ in loud[-25:]]) < -20  # antennas back for condition F
+    assert all(abs(h[0]) <= 25 and abs(h[1]) <= 25 for h, *_ in loud)
 
 
 def test_loudness_scale():
@@ -326,4 +327,51 @@ def test_reachy_pose_scales_with_antagonism():
     mild.speak("x", SpeechCue(1, "F", 1))
     first = lambda b: b._mini.poses[0][0]                                     # antennas of the condition pose
     assert abs(first(strong)[0]) > abs(first(mild)[0])
-    assert expression_gain(SpeechCue(0, "D")) == 1.0 and expression_gain(SpeechCue(3, "F", 3)) == 1.5
+    assert expression_gain(SpeechCue(0, "D")) == 1.0 and expression_gain(SpeechCue(3, "F", 3)) == 1.75
+    assert expression_gain(SpeechCue(1, "F", 1)) == 0.75
+
+
+def _speak_to_animator(key, gain, text, seconds=3.0, seed=7):
+    """Drive the Animator as speak() does: style, pose, syllable-like speech, sentence endings."""
+    from antagonist_robot.robots.reachy_mini import sentence_endings
+    a = Animator(mini=None, poses=DEFAULT_POSES, seed=seed)
+    t = 100.0
+    a.set_state(key, 0.4, gain=gain)
+    a.set_style(key, gain)
+    speech = np.sin(np.linspace(0, 2 * np.pi * 180 * seconds, int(16000 * seconds))).astype(np.float32)
+    speech *= np.tile(np.r_[np.ones(2000), np.zeros(2000)], int(seconds * 4))[:len(speech)]
+    a.feed(speech, 16000, t)
+    endings = sentence_endings(text)
+    for k, e in enumerate(endings):                    # sentences spread evenly over the speech
+        a.sentence_end(t + seconds * (k + 1) / len(endings), e)
+    out = []
+    for _ in range(int((seconds + 0.5) * 50)):
+        t += 0.02
+        out.append(a.tick(t, 0.02))
+    return out
+
+
+def test_strong_reply_moves_much_more_than_a_mild_one():
+    from antagonist_robot.robots.reachy_mini import expression_gain
+    mild = _speak_to_animator("F", expression_gain(SpeechCue(1, "F", 1)), "You are wrong. That is weak.")
+    strong = _speak_to_animator("F", expression_gain(SpeechCue(3, "F", 3)), "You are wrong. That is weak.")
+    lean = lambda run: np.mean([x for _, _, _, x, _ in run])                 # toward the listener, mm
+    pitch = lambda run: np.mean([h[1] for h, *_ in run])                     # head lowered, glaring
+    assert lean(strong) > 1.8 * lean(mild) and pitch(strong) > 1.5 * pitch(mild)
+
+
+def test_question_and_sarcasm_and_dismissal_have_their_own_gestures():
+    calm = _speak_to_animator("D", 1.25, "You think so. Fine.")
+    asked = _speak_to_animator("D", 1.25, "You think so? Really?")
+    yaw = lambda run: np.ptp([h[2] for h, *_ in run])
+    assert yaw(asked) > yaw(calm) + 10                                         # head shake on a question
+    sarcastic = _speak_to_animator("C", 1.25, "Oh, brilliant plan. Truly.")
+    assert max(-h[1] for h, *_ in sarcastic) > 8                               # eye-roll: looks up
+    dismissive = _speak_to_animator("B", 1.25, "Whatever. Next.")
+    assert np.mean([b for *_, b in dismissive[-40:]]) > 20                     # body turned away
+
+
+def test_sentence_endings_follow_the_text():
+    from antagonist_robot.robots.reachy_mini import sentence_endings
+    assert sentence_endings("That is naive. Why would that work? Prove it!") == [".", "?", "!"]
+    assert sentence_endings("no punctuation") == ["."]
