@@ -27,7 +27,7 @@ To run a full session in the console, copy `.env.example` to `.env` and put an A
 python main.py --robot text --script examples/demo_script.yaml
 ```
 
-then open http://localhost:8000, set the matrix (e.g. D, I2, +2), and press **Start**. A scripted participant talks to a robot whose replies are printed; each reply waits in the review panel for **Send**, **Temper**, or the timer. The expected behavior is listed under [Demo without a robot](#demo-without-a-robot-about-5-minutes). Without running anything, `examples/demo_sessions/` holds three recorded sessions (JSON and CSV, one row per candidate reply), and two recorded videos of complete sessions with a simulated Furhat and Reachy Mini accompany the paper. To rehearse with a simulated robot, see [Rehearsing a protocol in simulation](#rehearsing-a-protocol-in-simulation).
+then open http://localhost:8000, set the matrix (e.g. D, I2, +2), and press **Start**. A scripted participant talks to a robot whose replies are printed; each reply waits in the review panel for **Send**, **Temper**, or the timer. The expected behavior is listed under [Demo without a robot](#demo-without-a-robot-about-5-minutes). Without running anything, `examples/demo_sessions/` holds three recorded sessions (JSON and CSV, one row per candidate reply), and two recorded videos of complete sessions with a simulated Furhat and Reachy Mini accompany the paper. To try the study with a simulated robot, see [Talking to a simulated robot](#talking-to-a-simulated-robot).
 
 ![RAWR operator console](docs/operator_console.png)
 
@@ -157,9 +157,38 @@ pip install -r requirements-dev.txt
 python -m pytest tests -q
 ```
 
+## Talking to a simulated robot
+
+Before moving to a physical robot, you can run the study digitally: speak to a simulated robot
+and operate it from the console exactly as in the lab (Send, Temper, Hold, condition changes,
+Stop speech). The session is logged like a real one.
+
+**Reachy Mini (MuJoCo).** The simulator has no microphones, so RAWR hears you through the
+computer's microphone.
+
+```bash
+pip install "reachy-mini[mujoco]"
+reachy-mini-daemon --sim                       # terminal 1: opens the simulated robot
+python main.py --robot reachy_mini --port 8090 # terminal 2: the daemon already uses port 8000
+```
+
+Then open http://localhost:8090, set the condition, enter a participant ID, press **Start**, and talk.
+
+**Virtual Furhat.** Start the virtual Furhat in the Furhat SDK with the Remote API skill, then
+`python main.py --robot furhat`. Listening goes through Furhat's own recognizer; speech
+recognition on the virtual Furhat has not been tested yet.
+
+**NAO (mock).** `python tools/mock_nao.py` in one terminal, then
+`python main.py --nao-ip 127.0.0.1` with `audio.input: computer` in `config.yaml`. The mock prints
+what the robot would say instead of speaking.
+
+Use your study configuration (`--config`), so the test runs the same models, checks, review
+policy, and non-verbal cues as the study.
+
 ## Rehearsing a protocol in simulation
 
-Before running participants, rehearse the protocol against a simulated robot. `tools/simulation/rehearse.py` starts the simulator and the console, then plays a scenario: a scripted participant says the scenario's lines and a scripted operator sets the condition, holds, sends, tempers, and changes the condition in the console, as a real operator would. Every reply goes through the same pipeline as in a study, so you see what each condition produces, what the gate holds and why, and how long each step takes.
+When a check must be repeatable, for example to compare conditions on the same participant lines
+or to re-test after changing the model, rehearse the protocol unattended instead. `tools/simulation/rehearse.py` starts the simulator and the console, then plays a scenario: a scripted participant says the scenario's lines and a scripted operator sets the condition, holds, sends, tempers, and changes the condition in the console, as a real operator would. Every reply goes through the same pipeline as in a study, so you see what each condition produces, what the gate holds and why, and how long each step takes.
 
 ```bash
 pip install playwright                     # drives the console (uses an installed Chrome, or: playwright install chromium)
@@ -298,7 +327,7 @@ antagonist_robot/
 webui/                       earlier React panel design (not served by the server)
 tools/mock_nao.py, tools/fake_naoqi/   robot-free NAO dry runs and tests
 tools/robot_smoke_test.py    per-robot connect / speak / Stop check
-tools/simulation/            rehearse a protocol with a simulated robot; optional side-by-side video
+tools/simulation/            scripted rehearsal with a simulated robot; optional side-by-side video
 tools/train_fidelity_detector.py      trains the offline detector
 tools/study_report.py        study report (report.md + report.json) from the session database
 examples/                    demo script, demo sessions, robot check records
