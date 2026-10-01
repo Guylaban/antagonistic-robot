@@ -112,12 +112,13 @@ DEFAULT_FACES = {
     "B": {"BROW_UP_LEFT": 0.3, "BROW_UP_RIGHT": 0.3, "EYE_SQUINT_LEFT": 0.3, "EYE_SQUINT_RIGHT": 0.3,
           "NECK_PAN": 12.0},
     "C": {"SMILE_CLOSED": 0.5, "BROW_UP_LEFT": 0.8, "NECK_ROLL": 8.0},
-    "D": {"BROW_DOWN_LEFT": 0.6, "BROW_DOWN_RIGHT": 0.6, "BROW_IN_LEFT": 0.4, "BROW_IN_RIGHT": 0.4},
+    "D": {"BROW_DOWN_LEFT": 0.6, "BROW_DOWN_RIGHT": 0.6, "BROW_IN_LEFT": 0.4, "BROW_IN_RIGHT": 0.4,
+          "NECK_TILT": -6.0},                                     # chin up
     "E": {"SMILE_CLOSED": 0.4, "BROW_UP_RIGHT": 0.5, "NECK_ROLL": -6.0},
-    "F": {"EXPR_ANGER": 0.6, "BROW_DOWN_LEFT": 0.8, "BROW_DOWN_RIGHT": 0.8, "EYE_SQUINT_LEFT": 0.4,
-          "EYE_SQUINT_RIGHT": 0.4},
-    "G": {"EXPR_ANGER": 0.8, "EXPR_DISGUST": 0.4, "BROW_DOWN_LEFT": 1.0, "BROW_DOWN_RIGHT": 1.0,
-          "EYE_SQUINT_LEFT": 0.5, "EYE_SQUINT_RIGHT": 0.5},
+    "F": {"EXPR_ANGER": 0.7, "BROW_DOWN_LEFT": 0.8, "BROW_DOWN_RIGHT": 0.8, "EYE_SQUINT_LEFT": 0.4,
+          "EYE_SQUINT_RIGHT": 0.4, "NECK_TILT": 8.0},             # head down, glaring
+    "G": {"EXPR_ANGER": 0.85, "EXPR_DISGUST": 0.45, "BROW_DOWN_LEFT": 1.0, "BROW_DOWN_RIGHT": 1.0,
+          "EYE_SQUINT_LEFT": 0.55, "EYE_SQUINT_RIGHT": 0.55, "NECK_TILT": 10.0},
 }
 # Gesture at a sentence ending, by its punctuation (built-in names): a head shake on a confrontational
 # question, a raised brow on a sarcastic one, an angry flash on an aggressive exclamation.
