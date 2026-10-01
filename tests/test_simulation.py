@@ -55,7 +55,7 @@ def test_replacement_actions_are_checked():
 def test_caption_switches_on_the_hold_reason():
     caps = yaml.safe_load(DEMO.read_text(encoding="utf-8"))["captions"]
     plain = scn.caption_for(caps, "t5_held", ["monitor: clear psychosocial risk"])
-    assert plain["pause"] == 0 and "monitor holds" in plain["body"]
+    assert plain["pause"] == 0 and "waits for the operator" in plain["body"]
     soft = scn.caption_for(caps, "t5_held", ["judge fidelity 0/10 below 4 (exhibits NEUTRAL): possible softening"])
     assert soft["essential"] and soft["pause"] > 0
     assert "neutral (fidelity 0/10)" in soft["body"] and soft["highlight"] == ["pending", "fidelity"]

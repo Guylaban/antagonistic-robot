@@ -34,8 +34,9 @@ steps:
     apply: true
     moment: apply_support
   - reply: {on_arrival: t4_auto, action: send, review_s: 1.5}
-  - matrix: {polar: 2, category: D, modifiers: {M4: true}}
+  - matrix: {polar: 3, category: F, subtype: 3, modifiers: {M4: true}}
     apply: true
+    moment: apply_aggressive
   - reply: {on_review: t5_held, action: send}
   - end: {moment: end}
 
@@ -94,9 +95,15 @@ captions:
     highlight: [pending, safety, psych]
     pause: 4.5
     essential: true
+  apply_aggressive:
+    title: Escalation to the strongest condition
+    body: "For the last turn the operator raises the condition to Aggressive, intensity 3, at +3. Its configuration rating is Red, so no reply can be released by the timer."
+    highlight: [matrix]
+    pause: 4
+    essential: true
   t5_held:
-    title: Back to confrontational
-    body: The operator returns to Confrontational +2 for the last turn; the monitor holds the reply and the operator sends it.
+    title: Strongest condition, strongest body language
+    body: The reply waits for the operator, who sends it. The robot's pose and gestures follow the reply's intensity, so they are now at their sharpest.
     if_reason:
       softening:
         title: "Too soft: held by the manipulation check"

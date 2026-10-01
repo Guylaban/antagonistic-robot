@@ -196,7 +196,7 @@ def robot_label(robot, cfg, caps):
     """Two caption lines under the robot view, from what the console reported about the robot."""
     cues = caps.get("expressions")
     if robot == "reachy_mini":
-        motion = "speech-driven head and antenna motion; " if cues and cfg.get("reachy_mini", {}).get("animate", True) else ""
+        motion = "motion follows the reply; " if cues and cfg.get("reachy_mini", {}).get("animate", True) else ""
         voice = "neural voice (Kokoro-82M)" if "Kokoro" in caps.get("speech", "") else "system voice"
         return ["Robot: Reachy Mini (MuJoCo simulation)", motion + voice]
     if robot == "furhat":
