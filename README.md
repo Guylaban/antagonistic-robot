@@ -12,6 +12,23 @@ The participant talks to the robot, and the robot listens and speaks: RAWR hears
 
 The operator sends, tempers (one level milder), intensifies (one level stronger), regenerates, or holds the reply. Low-risk replies can be released automatically after a short review window; flagged replies always need an explicit decision. Every generated reply, spoken or not, and every operator action are logged.
 
+## Quick start for reviewers
+
+No robot is needed. With Python 3.10 or newer:
+
+```bash
+pip install -r requirements-dev.txt   # the core requirements plus pytest
+python -m pytest tests -q              # 64 offline tests: no API key, robot, or microphone
+```
+
+To run a full session in the console, copy `.env.example` to `.env` and put an API key for an OpenAI-compatible endpoint in it (default: xAI, `GROK_API_KEY`; or point `llm` in `config.yaml` at another provider or a local server such as Ollama) and run
+
+```bash
+python main.py --robot text --script examples/demo_script.yaml
+```
+
+then open http://localhost:8000, set the matrix (e.g. D, I2, +2), and press **Start**. A scripted participant talks to a robot whose replies are printed; each reply waits in the review panel for **Send**, **Temper**, or the timer. The expected behavior is listed under [Demo without a robot](#demo-without-a-robot-about-5-minutes). Without running anything, `examples/demo_sessions/` holds three recorded sessions (JSON and CSV, one row per candidate reply), and two recorded videos of complete sessions with a simulated Furhat and Reachy Mini accompany the paper. To rehearse with a simulated robot, see [Rehearsing a protocol in simulation](#rehearsing-a-protocol-in-simulation).
+
 ![RAWR operator console](docs/operator_console.png)
 
 *The console driving a virtual Furhat (Confrontational, then Passive-Aggressive at intensity 1, polar level +1, Gaslighting and Condescending). The previous reply was tempered from +2 to +1 before it was spoken. The pending reply is held because the psychosocial monitor rates it as clearly insulting; the fidelity judge rates it 8/10 as Passive-Aggressive at intensity 1, as requested. The header warns that Stop speech is unverified on this robot.*
