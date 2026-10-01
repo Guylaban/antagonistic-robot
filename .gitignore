@@ -20,6 +20,7 @@ robot_state.txt
 
 # Runtime data (database, audio)
 data/
+runs/                      # rehearsal outputs (tools/simulation/rehearse.py)
 
 # Session logs (contain participant data)
 logs/

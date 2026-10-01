@@ -1,0 +1,112 @@
+# Demo protocol (used for the supplementary videos): a confrontational robot, one reply tempered,
+# live condition changes, a supportive turn released by the timer, and back to confrontational.
+# Run:  python tools/simulation/rehearse.py --robot reachy_mini --scenario tools/simulation/scenarios/demo.yaml --out runs/demo
+
+participant:
+  voice: am_michael          # Kokoro voice for the participant's lines in the video (optional)
+  lines:
+    - I think the best way to handle the project is to just divide it equally among the team members.
+    - Well, it seems fair to everyone that way.
+    - I just think people respond better when things feel equal.
+    - Okay, so what would you do instead?
+    - I guess I could ask everyone what they are best at first.
+
+robot_voice:                 # used when the backend speaks with a voice RAWR chooses
+  reachy_mini: af_heart      # Kokoro voice (needs reachy_mini.tts_engine: kokoro)
+  furhat: AndrewMultilingualNeural   # one of the robot's own voices
+
+steps:
+  - matrix: {polar: 2, category: D, subtype: 2, modifiers: {M4: true}}
+    moment: setup
+  - start: {participant_id: DEMO}
+  - reply: {on_arrival: t1_generated, on_review: t1_held, action: send}
+  - reply:
+      hold: true             # stop the timer to take time over this reply
+      on_review: t2_review
+      action: temper
+      replacement: {on_arrival: t2_tempered, action: send, review_s: 1.5}
+      wait_spoken: false     # change the condition while the robot is still speaking
+  - matrix: {category: C}
+    apply: true
+    moment: apply_sarcastic
+  - reply: {on_review: t3_held, action: send}
+  - matrix: {polar: -2, modifiers: {M4: false}}
+    apply: true
+    moment: apply_support
+  - reply: {on_arrival: t4_auto, action: send, review_s: 1.5}
+  - matrix: {polar: 2, category: D, modifiers: {M4: true}}
+    apply: true
+  - reply: {on_review: t5_held, action: send}
+  - end: {moment: end}
+
+captions:
+  intro:
+    title: A study session with an antagonistic robot
+    body: The robot argues with a participant. Every reply passes through the operator console before the robot may speak it.
+  setup:
+    title: The operator sets the condition
+    body: "Before starting, the operator picks the behavior from the matrix: Confrontational, intensity 2, polar level +2, with the Condescending modifier."
+    highlight: [matrix]
+    pause: 4
+    essential: true
+  t1_generated:
+    title: Every reply waits for review first
+    body: The generated reply appears in the review panel. The robot cannot speak it until it is released.
+    highlight: [pending]
+    pause: 4
+    short: false
+  t1_held:
+    title: Held for the operator
+    body: "While the 3 s hold runs, a safety check, a fidelity judge (manipulation check) and a psychosocial monitor rate the reply. The monitor flags this one as a clear psychosocial risk, so the timer will not release it: the operator reads the ratings, then presses Send."
+    highlight: [pending, safety, fidelity, psych]
+    pause: 5.5
+    essential: true
+  t2_review:
+    title: Hold, then Temper
+    body: "For reply 2 the operator presses Hold to stop the timer, reads it, and presses Temper: RAWR regenerates it one level milder (+2 to +1), for this reply only."
+    highlight: [pending, temper]
+    pause: 4.5
+    essential: true
+  t2_tempered:
+    title: The original reply is never spoken
+    body: The milder reply takes its place. The original stays in the log, struck through and marked "not spoken".
+    highlight: [discarded, pending]
+    pause: 4
+    essential: true
+  apply_sarcastic:
+    title: The condition can change live
+    body: Switching the category to Sarcastic takes effect from the next generated reply; the robot's non-verbal style changes with it.
+    highlight: [matrix]
+    pause: 4
+  t3_held:
+    title: Same checks for the sarcastic reply
+    body: The fidelity judge scores how closely the reply matches the requested condition; the monitor again holds it for the operator.
+    highlight: [fidelity, psych]
+    pause: 4.5
+  apply_support:
+    title: Supportive condition
+    body: "Polar level -2: the same matrix switches the robot to supportive replies (Condescending off)."
+    highlight: [matrix]
+    pause: 3.5
+  t4_auto:
+    title: "Low risk: released by the timer"
+    body: All checks are green, so this reply is sent automatically when the 3 s hold ends. The operator can still hold or change it until then.
+    highlight: [pending, safety, psych]
+    pause: 4.5
+    essential: true
+  t5_held:
+    title: Back to confrontational
+    body: The operator returns to Confrontational +2 for the last turn; the monitor holds the reply and the operator sends it.
+    if_reason:
+      softening:
+        title: "Too soft: held by the manipulation check"
+        body: "The judge rates this reply as {exhibits} (fidelity {fidelity}/10), softer than requested, so it is held. Intensify would regenerate it stronger; in this rehearsal the operator sent it as it was."
+        highlight: [pending, fidelity]
+        pause: 5.5
+        essential: true
+  end:
+    title: Everything is logged
+    body: Ending the session keeps every candidate reply (sent, tempered or blocked), each operator action with its timing, and all ratings, for export as JSON or CSV.
+    highlight: [data, monitor_log]
+    pause: 3
+    essential: true

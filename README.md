@@ -140,6 +140,28 @@ pip install -r requirements-dev.txt
 python -m pytest tests -q
 ```
 
+## Rehearsing a protocol in simulation
+
+Before running participants, rehearse the protocol against a simulated robot. `tools/simulation/rehearse.py` starts the simulator and the console, then plays a scenario: a scripted participant says the scenario's lines and a scripted operator sets the condition, holds, sends, tempers, and changes the condition in the console, as a real operator would. Every reply goes through the same pipeline as in a study, so you see what each condition produces, what the gate holds and why, and how long each step takes.
+
+```bash
+pip install playwright                     # drives the console (uses an installed Chrome, or: playwright install chromium)
+python tools/simulation/rehearse.py --robot reachy_mini --scenario tools/simulation/scenarios/demo.yaml --out runs/rehearsal1
+```
+
+| `--robot` | simulator | started by the script |
+|---|---|---|
+| `reachy_mini` | MuJoCo simulation (`reachy-mini-daemon --sim`) | yes |
+| `furhat` | virtual Furhat of the Furhat SDK with the Remote API skill | no: start it first (window not minimized) |
+| `nao` | `tools/mock_nao.py` (real speaker-server code, stand-in NAOqi) | yes |
+| `text` | none (replies printed) | - |
+
+The run folder (never overwritten) holds the configuration used, the session database, the console log, `timeline.json` (operator actions), and `summary.csv`: one row per candidate reply with its condition, risk rating, judge fidelity, detector probability, monitor score, why it was held, the decision, who made it, and the review time. `--config` selects your study configuration (monitor, judge, review policy); `--expressions` turns on non-verbal cues.
+
+With `--video`, the run is also recorded: the console (headless Chrome), the robot (Reachy Mini: joint positions sampled from the simulator, rendered offscreen in MuJoCo afterwards; virtual Furhat: Windows Graphics Capture of its window and the speaker output, Windows only), and, if Kokoro is installed, the participant's lines in a synthetic voice. `rehearsal_full.mp4` and `rehearsal_short.mp4` put the console and the robot side by side with a caption panel; at each moment with a caption the video pauses on a screenshot, dims the console, and outlines the panels the caption describes. The short cut keeps only the pauses marked `essential` (the supplementary videos are short cuts of `scenarios/demo.yaml`). `python tools/simulation/compose.py RUN --scenario S --cut full|short|none` recomposes a run.
+
+Write your own scenario by copying `tools/simulation/scenarios/demo.yaml`: `participant.lines`, operator `steps` (`matrix`, `start`, `reply` with `hold`, `action: send|temper|intensify|regenerate` and a `replacement`, `end`), and optional `captions` keyed by the moments the steps name. The format is documented at the top of `tools/simulation/scenario.py`.
+
 ## Running a study session
 
 1. Start the robot side: `python deploy_nao.py` (NAO/Pepper), the Remote API skill (Furhat), or the Reachy Mini daemon.
@@ -227,6 +249,7 @@ antagonist_robot/
 webui/                       earlier React panel design (not served by the server)
 tools/mock_nao.py, tools/fake_naoqi/   robot-free NAO dry runs and tests
 tools/robot_smoke_test.py    per-robot connect / speak / Stop check
+tools/simulation/            rehearse a protocol with a simulated robot; optional side-by-side video
 tools/train_fidelity_detector.py      trains the offline detector
 examples/                    demo script, demo sessions, robot check records
 tests/                       offline test suite
