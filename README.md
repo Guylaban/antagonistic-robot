@@ -18,7 +18,7 @@ No robot is needed. With Python 3.10 or newer:
 
 ```bash
 pip install -r requirements-dev.txt   # the core requirements plus pytest
-python -m pytest tests -q              # 67 offline tests: no API key, robot, or microphone
+python -m pytest tests -q              # 72 offline tests: no API key, robot, or microphone
 ```
 
 To run a full session in the console, copy `.env.example` to `.env` and put an API key for an OpenAI-compatible endpoint in it (default: xAI, `GROK_API_KEY`; or point `llm` in `config.yaml` at another provider or a local server such as Ollama) and run
