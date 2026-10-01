@@ -20,6 +20,7 @@ from pydantic import BaseModel
 
 from antagonist_robot.conversation.manager import ConversationManager
 from antagonist_robot.logging.session_logger import SessionLogger
+from antagonist_robot.logging.study_report import build_report, render_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -286,6 +287,18 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
             session_logger.export_csv(), media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=rawr_all_sessions.csv"},
         )
+
+    @app.get("/api/report.json")
+    async def study_report_json():
+        """Study report over every session in the database (see docs/reporting_template.md)."""
+        report = await asyncio.to_thread(build_report, session_logger.db_path)
+        return JSONResponse(report, headers={"Content-Disposition": "attachment; filename=rawr_study_report.json"})
+
+    @app.get("/api/report.md")
+    async def study_report_md():
+        report = await asyncio.to_thread(build_report, session_logger.db_path)
+        return Response(render_markdown(report), media_type="text/markdown",
+                        headers={"Content-Disposition": "attachment; filename=rawr_study_report.md"})
 
     # --- WebSocket -------------------------------------------------------------------
 

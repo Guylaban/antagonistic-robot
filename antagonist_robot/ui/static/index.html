@@ -195,6 +195,7 @@
     <div class="card">
       <h2>Data</h2>
       <div class="row"><button class="btn" id="jsonBtn" disabled>Session JSON</button><button class="btn" id="csvBtn" disabled>Session CSV</button></div>
+      <div class="row"><button class="btn" id="reportBtn" title="Report over all sessions: review policy, operator decisions, manipulation check">Study report</button><button class="btn" id="reportJsonBtn">Report JSON</button></div>
     </div>
   </section>
 </main>
@@ -274,6 +275,8 @@ function sessionEnded(reason) {
 $("stopSpeechBtn").onclick = () => api("/api/robot/stop", {});
 $("jsonBtn").onclick = () => S.session && window.open(`/api/sessions/${S.session}/export`);
 $("csvBtn").onclick = () => S.session && window.open(`/api/sessions/${S.session}/export.csv`);
+$("reportBtn").onclick = () => window.open("/api/report.md");
+$("reportJsonBtn").onclick = () => window.open("/api/report.json");
 
 // --- turn monitor ----------------------------------------------------------------------
 function addMsg(cls, who, text, tag, id) {

@@ -337,6 +337,10 @@ class SessionLogger:
 
     # --- reading and export ----------------------------------------------------
 
+    @property
+    def db_path(self) -> str:
+        return self._db_path
+
     def get_sessions(self) -> list:
         with self._lock:
             cursor = self._conn.execute("SELECT * FROM sessions ORDER BY start_time DESC")

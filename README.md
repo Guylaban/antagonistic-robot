@@ -186,10 +186,41 @@ Write your own scenario by copying `tools/simulation/scenarios/demo.yaml`: `part
 3. `python main.py --robot <backend>` (exits with an error if the robot does not answer).
 4. Open the console, choose the review policy, set the parameters, enter the participant ID, and **Start**.
 5. After the session, export the data; everything is also in `data/Antagonistic Robot.db`.
+6. When data collection is done, write the study report (next section).
 
 `python main.py --no-ui` runs a terminal console instead: every reply is printed and blocked replies ask for `[s]end / [t]emper / [i]ntensify / [r]egenerate`.
 
 The console binds to `127.0.0.1` by default and has no authentication; do not expose it on an untrusted network.
+
+## Reporting a study
+
+The operator's decisions shape what participants hear, so they are part of the manipulation
+and belong in the paper. RAWR writes a study report from the session database:
+
+```
+python tools/study_report.py "data/Antagonistic Robot.db" --title "Study 1"
+```
+
+This writes `reports/<timestamp>/report.md` and `report.json` (a new folder each run, so
+earlier reports are kept; `--participants` or `--sessions` select a subset, `--out` names the
+folder). The console's **Study report** and **Report JSON** buttons give the same report for
+every session in the database. The report covers:
+
+- the robot, its speech and whether Stop was verified, the models, and the non-verbal cues;
+- the review policy and any changes to it during sessions;
+- the conditions as spoken, condition changes, and turns spoken below the requested level;
+- what happened to every generated reply (sent, released automatically, tempered, intensified,
+  regenerated, withheld), who decided, why replies waited for the operator, and how long the
+  operator took;
+- the manipulation check: the judge's fidelity, category match, and intensity for the replies
+  participants heard, overall and per condition, and the softening detector;
+- risk ratings, monitor flags, distress cues, how sessions ended, and latencies;
+- a draft methods paragraph built from these numbers.
+
+The Markdown comes from [`docs/reporting_template.md`](docs/reporting_template.md); edit it (or
+pass `--template`) to change the layout. Items the log cannot know, such as ethics approval,
+operator training, and the participants' own manipulation-check answers, are marked
+**[researcher]** for you to fill in. `reports/` holds participant data and is git-ignored.
 
 ## Configuration (`config.yaml`)
 
@@ -241,6 +272,7 @@ Participant audio: `data/audio/<session_id>/turn_NNN_user.wav` (16 kHz, 16-bit m
 | POST | `/api/robot/stop` | interrupt robot speech |
 | POST | `/api/session/start`, `/api/session/stop` | session control |
 | GET | `/api/sessions`, `/api/sessions/{id}/export`, `/api/sessions/{id}/export.csv`, `/api/export.csv` | data |
+| GET | `/api/report.md`, `/api/report.json` | study report over all sessions (see [Reporting a study](#reporting-a-study)) |
 | WS | `/ws/conversation` | live events (participant, candidate, monitor, fidelity, candidate_blocked, speaking, turn_complete, end_suggested, session_ended) |
 
 NAO speaker-server protocol (`nao_speaker_server.py`, TCP, one line per connection): text → spoken, reply `ok` (or `stopped` if interrupted); `__STOP__` → interrupt, reply `stopped`; `__PING__` → reply `pong`.
@@ -268,6 +300,7 @@ tools/mock_nao.py, tools/fake_naoqi/   robot-free NAO dry runs and tests
 tools/robot_smoke_test.py    per-robot connect / speak / Stop check
 tools/simulation/            rehearse a protocol with a simulated robot; optional side-by-side video
 tools/train_fidelity_detector.py      trains the offline detector
+tools/study_report.py        study report (report.md + report.json) from the session database
 examples/                    demo script, demo sessions, robot check records
 tests/                       offline test suite
 ```

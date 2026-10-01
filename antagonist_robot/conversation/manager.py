@@ -402,6 +402,8 @@ class ConversationManager:
 
             decision = self._gate.wait(lambda: self._is_current(session_id))
             review_ms_total += decision.wait_ms
+            if decision.held_for:  # reasons added during review (monitor, judge, operator hold)
+                self._logger.update_candidate(candidate_id, blocked_reasons_json=decision.held_for)
 
             if decision.action in ("temper", "intensify", "regenerate"):
                 disposition = {"temper": "tempered", "intensify": "intensified",

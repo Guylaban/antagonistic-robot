@@ -29,7 +29,7 @@ act() is called from the web server thread.
 
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Callable, Iterable, Optional
 
 from antagonist_robot.config.settings import OperatorConfig
@@ -44,6 +44,7 @@ class GateDecision:
     action: str            # send | auto_send | temper | intensify | regenerate | end
     decided_by: str        # "operator" | "timer" | "system"
     wait_ms: int           # time the response was held
+    held_for: list = field(default_factory=list)  # every reason automatic release was cancelled
 
 
 class OperatorGate:
@@ -131,11 +132,13 @@ class OperatorGate:
                     self._cond.wait(timeout=0.1)
 
     def _close(self, action: str, by: str, start: float) -> GateDecision:
+        held_for = list(self._blocked_reasons)
         self._candidate_id = None
         self._action = None
         self._deadline = None
         self._awaiting = set()
-        return GateDecision(action=action, decided_by=by, wait_ms=round((time.monotonic() - start) * 1000))
+        return GateDecision(action=action, decided_by=by, wait_ms=round((time.monotonic() - start) * 1000),
+                            held_for=held_for)
 
     # --- web-server / signal side -------------------------------------------
 
