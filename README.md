@@ -272,6 +272,13 @@ examples/                    demo script, demo sessions, robot check records
 tests/                       offline test suite
 ```
 
+## Extending RAWR
+
+- **A new robot.** Subclass `RobotBackend` (`antagonist_robot/robots/base.py`): implement `connect`, `speak` (blocking; returns False if interrupted), and `stop`, and provide listening through `mic_source()` (the robot's microphone; RAWR runs VAD and ASR) or `recognizer()` (the robot's own speech recognition). State cues (`on_listening`, `on_thinking`, `on_idle`) and non-verbal cues are optional. Register the backend in `create_backend` (`antagonist_robot/robots/__init__.py`), add its settings to `config.yaml`, then run `python tools/robot_smoke_test.py --robot <name>` to measure whether Stop speech works. `robots/furhat.py` and `robots/reachy_mini.py` are compact examples of the two listening styles.
+- **Behavior definitions.** The category, intensity, and modifier texts the prompt compiler writes into every system prompt are plain strings in `antagonist_robot/conversation/avct_manager.py` (`CATEGORY_DEFINITIONS`, `SUBTYPE_DEFINITIONS`, `MODIFIER_DEFINITIONS`). Changing their wording needs no other change; adding a category also needs an entry in the console's `CATS` list (`antagonist_robot/ui/static/index.html`) and a risk mapping in `config_risk` (`conversation/safety.py`).
+- **Policy, thresholds, and models.** Review mode, hold window, release threshold, the judge's blocking threshold, and the generation, monitor, and judge models are all in `config.yaml` (see Configuration).
+- **A new background signal.** Follow the monitor and the judge in `antagonist_robot/conversation/manager.py`: start the signal when a candidate is created, add its name to the signals the gate waits for (`await_signals` in `OperatorGate.open`), and when it finishes, call `escalate(candidate_id, reason)` to hold the reply with a reason the console shows, then `signal_done(candidate_id, name)`.
+
 ## Responsible use
 
 RAWR produces behavior intended to be unpleasant. It is research infrastructure for studies approved by an ethics board, not a template for deployed robots.
