@@ -55,8 +55,8 @@ class FakeFurhat:
     def say_stop(self):
         self.calls.append(("say_stop",))
 
-    def gesture(self, name=None, blocking=False, body=None):
-        self.calls.append(("gesture", name) if body is None else ("face", body))
+    def gesture(self, name, blocking=False):
+        self.calls.append(("gesture", name))
 
     def set_led(self, red, green, blue):
         self.calls.append(("led", red, green, blue))
@@ -287,16 +287,9 @@ class UrlFurhat(FakeFurhat):
         self.calls.append(("say", text, url is not None, lipsync, len(data or b"")))
 
 
-class PerSentenceTTS:
-    """Like Kokoro when Furhat speaks one sentence at a time: one 0.5 s part per call."""
-
-    def stream(self, text):
-        yield np.full(8000, 0.1, np.float32), 16000
-
-
 def test_furhat_plays_rawr_audio_with_lipsync(tmp_path):
     f = UrlFurhat(say_s=0.0)
-    b = FurhatBackend(client=f, tts_engine="kokoro", tts=PerSentenceTTS(), audio_port=18095,
+    b = FurhatBackend(client=f, tts_engine="kokoro", tts=TwoSentenceTTS(), audio_port=18095,
                       speech_log_dir=str(tmp_path))
     b.connect()
     assert b.speak("One. Two.") is True
@@ -307,18 +300,11 @@ def test_furhat_plays_rawr_audio_with_lipsync(tmp_path):
 
 
 def test_furhat_gestures_follow_the_antagonism_level():
-    text = "That is lazy. Why would that work? Think again!"
-    strong, mild = FakeFurhat(say_s=0.2), FakeFurhat(say_s=0.2)
-    FurhatBackend(client=strong, expressions=True).speak(text, SpeechCue(3, "F", 3))     # strength 1.0
-    FurhatBackend(client=mild, expressions=True).speak(text, SpeechCue(1, "F", 1))       # strength 0.33
-    g = lambda f: [c[1] for c in f.calls if c[0] == "gesture"]
-    assert g(strong) == ["BrowFrown", "BrowFrown", "Shake", "Shake", "ExpressAnger", "ExpressAnger"]
-    assert g(mild) == ["BrowFrown", "Shake", "BrowFrown", "ExpressAnger"]           # fewer, milder
-    face = lambda f: [c[1] for c in f.calls if c[0] == "face"]
-    held_strong, held_mild = face(strong)[0]["frames"][0]["params"], face(mild)[0]["frames"][0]["params"]
-    assert held_strong["EXPR_ANGER"] > 1.5 * held_mild["EXPR_ANGER"]                   # stronger glare
-    assert all(v == 0.0 for v in face(strong)[-1]["frames"][0]["params"].values())      # reset after the reply
-    assert [c[1] for c in strong.calls if c[0] == "say"] == ["That is lazy.", "Why would that work?", "Think again!"]
+    strong, mild = FakeFurhat(say_s=3.6), FakeFurhat(say_s=3.6)
+    FurhatBackend(client=strong, expressions=True).speak("x", SpeechCue(3, "F", 3))      # strength 1.0
+    FurhatBackend(client=mild, expressions=True).speak("x", SpeechCue(1, "F", 1))        # strength 0.33
+    assert [c[1] for c in strong.calls if c[0] == "gesture"] == ["BrowFrown", "Shake", "ExpressAnger"]
+    assert [c[1] for c in mild.calls if c[0] == "gesture"] == ["BrowFrown"]
 
 
 def test_expression_follows_the_reply_not_only_the_request():
