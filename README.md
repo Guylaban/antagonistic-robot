@@ -1,7 +1,7 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Robots](https://img.shields.io/badge/robots-NAO%20%7C%20Pepper%20%7C%20Furhat%20%7C%20Reachy%20Mini-orange)
 
-# CRAB: Controlled Robotic Antagonistic Behaviour Toolkit
+# CRAB: Controlled Robotic Antagonistic Behavior Toolkit
 
 CRAB is an operator console for running user studies in which a social robot behaves in controlled antagonistic ways, for example dismissive, sarcastic, or confrontational, while a trained researcher keeps control of every word the robot says. It drives SoftBank NAO and Pepper, Furhat, and Reachy Mini through one backend interface.
 

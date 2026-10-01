@@ -1,4 +1,4 @@
-"""CRAB (Controlled Robotic Antagonistic Behaviour): main entry point.
+"""CRAB (Controlled Robotic Antagonistic Behavior): main entry point.
 
 Initializes all components, verifies the robot's speaker server, and starts
 the operator console (or a terminal console with --no-ui).
@@ -52,7 +52,7 @@ def main():
         config.server.port = args.port
 
     print("=" * 58)
-    print("  CRAB: Controlled Robotic Antagonistic Behaviour")
+    print("  CRAB: Controlled Robotic Antagonistic Behavior")
     print("=" * 58)
 
     from antagonist_robot.pipeline.llm import LLMEngine
