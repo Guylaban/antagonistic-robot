@@ -91,7 +91,7 @@ class WebSocketManager:
 
 def create_app(manager: ConversationManager, session_logger: SessionLogger) -> FastAPI:
     """Create the FastAPI app with injected dependencies."""
-    app = FastAPI(title="RAWR operator console")
+    app = FastAPI(title="CRAB operator console")
     ws_manager = WebSocketManager()
 
     _conversation_thread: dict = {"thread": None, "generation": 0}
@@ -287,20 +287,20 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
         """Merged CSV of every session in the database."""
         return Response(
             session_logger.export_csv(), media_type="text/csv",
-            headers={"Content-Disposition": "attachment; filename=rawr_all_sessions.csv"},
+            headers={"Content-Disposition": "attachment; filename=crab_all_sessions.csv"},
         )
 
     @app.get("/api/report.json")
     async def study_report_json():
         """Study report over every session in the database (see docs/reporting_template.md)."""
         report = await asyncio.to_thread(build_report, session_logger.db_path)
-        return JSONResponse(report, headers={"Content-Disposition": "attachment; filename=rawr_study_report.json"})
+        return JSONResponse(report, headers={"Content-Disposition": "attachment; filename=crab_study_report.json"})
 
     @app.get("/api/report.md")
     async def study_report_md():
         report = await asyncio.to_thread(build_report, session_logger.db_path)
         return Response(render_markdown(report), media_type="text/markdown",
-                        headers={"Content-Disposition": "attachment; filename=rawr_study_report.md"})
+                        headers={"Content-Disposition": "attachment; filename=crab_study_report.md"})
 
     # --- WebSocket -------------------------------------------------------------------
 

@@ -59,7 +59,7 @@ def test_report_from_console_and_command_line(make_manager, tmp_path):
     manager, logger, _ = run_session(make_manager)
     with TestClient(create_app(manager, logger)) as client:
         assert client.get("/api/report.json").json()["review"]["spoken_turns"] == 1
-        assert client.get("/api/report.md").text.startswith("# RAWR study report")
+        assert client.get("/api/report.md").text.startswith("# CRAB study report")
 
     out = tmp_path / "report1"
     cmd = [sys.executable, str(ROOT / "tools" / "study_report.py"), logger.db_path, "--out", str(out),

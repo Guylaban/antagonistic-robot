@@ -287,7 +287,7 @@ class UrlFurhat(FakeFurhat):
         self.calls.append(("say", text, url is not None, lipsync, len(data or b"")))
 
 
-def test_furhat_plays_rawr_audio_with_lipsync(tmp_path):
+def test_furhat_plays_crab_audio_with_lipsync(tmp_path):
     f = UrlFurhat(say_s=0.0)
     b = FurhatBackend(client=f, tts_engine="kokoro", tts=TwoSentenceTTS(), audio_port=18095,
                       speech_log_dir=str(tmp_path))

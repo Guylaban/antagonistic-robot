@@ -101,7 +101,7 @@ class ConversationManager:
         self._running: bool = False
         self._session_start_time: Optional[float] = None
 
-        # Behavioral parameters (the RAWR parameter matrix)
+        # Behavioral parameters (the CRAB parameter matrix)
         self._polar_level: int = self._avct.default_polar_level
         self._category: str = self._avct.default_category
         self._subtype: int = self._avct.default_subtype

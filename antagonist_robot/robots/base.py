@@ -1,4 +1,4 @@
-"""Robot backend interface: the only way RAWR talks to a robot.
+"""Robot backend interface: the only way CRAB talks to a robot.
 
 A backend speaks released replies, can interrupt its own speech, listens
 through the robot, and reports what it can do. The conversation manager calls:
@@ -11,7 +11,7 @@ through the robot, and reports what it can do. The conversation manager calls:
     close()                          release the connection
 
 Listening goes through the robot too. A backend provides one of:
-    mic_source()   the robot's microphone as an audio source; RAWR runs VAD + ASR locally
+    mic_source()   the robot's microphone as an audio source; CRAB runs VAD + ASR locally
     recognizer()   the robot's own speech recognition (record_utterance / transcribe)
 
 Non-verbal cues (`robot.expressions`, on by default) follow the reply

@@ -2,7 +2,7 @@
 
 Speech: text to the speaker server (port nao.port), spoken by NAOqi ALTextToSpeech.
 Listening: the speaker server streams the robot's front microphone (port
-nao.port + 1) while RAWR is listening; RAWR runs VAD and ASR locally.
+nao.port + 1) while CRAB is listening; CRAB runs VAD and ASR locally.
 """
 
 import socket

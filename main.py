@@ -1,4 +1,4 @@
-"""RAWR (Robotic Antagonism Workbench for Research): main entry point.
+"""CRAB (Controlled Robotic Antagonistic Behaviour): main entry point.
 
 Initializes all components, verifies the robot's speaker server, and starts
 the operator console (or a terminal console with --no-ui).
@@ -27,7 +27,7 @@ load_dotenv()
 def main():
     """Parse arguments, load config, initialize all components, and start."""
     parser = argparse.ArgumentParser(
-        description="RAWR: operator-controlled antagonistic robot behavior for HRI research"
+        description="CRAB: operator-controlled antagonistic robot behavior for HRI research"
     )
     parser.add_argument("--config", default="config.yaml", help="Path to config YAML file (default: config.yaml)")
     parser.add_argument("--no-ui", action="store_true", help="Run a terminal console instead of the web console")
@@ -52,7 +52,7 @@ def main():
         config.server.port = args.port
 
     print("=" * 58)
-    print("  RAWR: Robotic Antagonism Workbench for Research")
+    print("  CRAB: Controlled Robotic Antagonistic Behaviour")
     print("=" * 58)
 
     from antagonist_robot.pipeline.llm import LLMEngine

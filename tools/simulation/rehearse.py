@@ -1,6 +1,6 @@
 """Rehearse a study protocol in simulation before running it with participants.
 
-Starts the simulated robot (unless --no-sim) and the RAWR console, then plays a scenario: a scripted
+Starts the simulated robot (unless --no-sim) and the CRAB console, then plays a scenario: a scripted
 participant says the scenario's lines, and a scripted operator sets the condition, holds, sends,
 tempers, and changes the condition in the console, as a real operator would. Everything goes through
 the same pipeline as a study (generation, safety check, fidelity judge and detector, psychosocial
@@ -262,7 +262,7 @@ def main():
         console = subprocess.Popen([sys.executable, str(ROOT / "main.py"), "--config", str(out / "config.yaml"),
                                     "--script", str(out / "participant_script.yaml")], cwd=str(ROOT),
                                    stdout=open(out / "console.log", "w", encoding="utf-8"), stderr=subprocess.STDOUT)
-        wait_http(f"http://127.0.0.1:{args.port}/api/status", 300, "the RAWR console")
+        wait_http(f"http://127.0.0.1:{args.port}/api/status", 300, "the CRAB console")
         caps = json.load(urllib.request.urlopen(f"http://127.0.0.1:{args.port}/api/status"))["capabilities"]
         log(f"robot: {caps['robot']}; speech: {caps['speech']}; Stop speech: {caps['interrupt']}")
         if args.video:

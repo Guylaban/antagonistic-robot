@@ -1,4 +1,4 @@
-"""Scripted operator: drives the RAWR web console with Playwright, following a scenario's steps.
+"""Scripted operator: drives the CRAB web console with Playwright, following a scenario's steps.
 
 At each step marked with a moment it saves a screenshot together with the positions of the console
 panels (for captions and highlights in the rehearsal video) and the reasons a pending reply is held.

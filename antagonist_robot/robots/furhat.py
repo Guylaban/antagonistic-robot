@@ -3,8 +3,8 @@
 Requires the Remote API skill running on the robot or on the virtual
 Furhat of the Furhat SDK (it listens on port 54321). Speech uses the
 robot's own voice (`say(text)`), or, with tts_engine "kokoro" or
-"system", audio synthesized by RAWR sentence by sentence and played by
-the robot with lip sync requested (`say(url, lipsync)`; RAWR serves
+"system", audio synthesized by CRAB sentence by sentence and played by
+the robot with lip sync requested (`say(url, lipsync)`; CRAB serves
 the WAV files over HTTP on audio_port, so the robot must be able to
 reach this computer). The default ("furhat", the robot's own voices,
 which include neural voices) is lip-synced; use the other engines only
@@ -14,7 +14,7 @@ text only. Optional non-verbal cues (expressions: true): a sequence of
 Furhat gestures per condition, played through each reply, a thinking
 expression while a reply is prepared, and the LED ring.
 
-Interruption: stop() sends `say_stop` and returns control to RAWR at once,
+Interruption: stop() sends `say_stop` and returns control to CRAB at once,
 so the session never waits on the robot. Whether the robot falls silent
 depends on the robot, so interruption is reported as "unverified"; check
 it with tools/robot_smoke_test.py.
@@ -43,7 +43,7 @@ class FurhatRecognizer:
     """Listening through Furhat's own microphones and speech recognition (Remote API listen()).
 
     Furhat's recognizer runs on the robot's side (a cloud ASR service), so no
-    raw audio reaches RAWR and none is archived; only the transcript is logged.
+    raw audio reaches CRAB and none is archived; only the transcript is logged.
     """
 
     def __init__(self, api: Callable, language: str = "en-US"):
@@ -143,9 +143,9 @@ class _AudioServer:
 
     def add(self, wav: bytes) -> str:
         self._n += 1
-        name = f"rawr_{self._n}.wav"
+        name = f"crab_{self._n}.wav"
         self._files[name] = wav
-        self._files.pop(f"rawr_{self._n - 20}.wav", None)
+        self._files.pop(f"crab_{self._n - 20}.wav", None)
         return f"{self.base}/{name}"
 
     def close(self) -> None:
@@ -246,7 +246,7 @@ class FurhatBackend(RobotBackend):
         next_gesture = time.monotonic() + every
         while not self._done.wait(0.05):
             if self._stop.is_set():
-                return False          # control returns to RAWR immediately
+                return False          # control returns to CRAB immediately
             if gestures and time.monotonic() >= next_gesture:
                 next_gesture += every
                 try:

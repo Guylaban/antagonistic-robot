@@ -35,7 +35,7 @@ PAN = (24, 880, 1872, 176)          # caption panel
 # The virtual Furhat's lips trail its own voice slightly; the face is shown this much earlier to align them.
 FURHAT_LIP_LEAD = 0.12
 ROBOT_LABELS = {
-    "reachy_mini": ("Robot: Reachy Mini (MuJoCo simulation)", "speech-driven head and antenna motion; robot voice from RAWR"),
+    "reachy_mini": ("Robot: Reachy Mini (MuJoCo simulation)", "speech-driven head and antenna motion; robot voice from CRAB"),
     "furhat": ("Robot: Furhat (virtual Furhat)", "Furhat's own voice with lip sync; condition-matched gestures"),
     "nao": ("Robot: NAO (mock robot)", "no robot view: the mock prints what the robot would say"),
     "text": ("No robot (text backend)", "replies are printed, not spoken"),
@@ -169,7 +169,7 @@ def compose(run: Path, sc: dict, cut: str = "full", out: Path = None) -> Path:
                 seg[-ramp:] *= np.linspace(1, 0, ramp)
             place(seg, a - t0)
     voiced = (run / "participant_audio.json").exists()
-    if voiced:                                       # each participant clip ends when RAWR received the line
+    if voiced:                                       # each participant clip ends when CRAB received the line
         meta = {m["text"]: m for m in json.load(open(run / "participant_audio.json"))}
         for created, llm_ms, text in db.execute("select created_at, latency_llm_ms, user_transcript from candidates "
                                                 "where session_id=? and attempt=1 order by turn_number", (sid,)):
@@ -238,9 +238,9 @@ def compose(run: Path, sc: dict, cut: str = "full", out: Path = None) -> Path:
     # ------------------------------------------------------------ static background
     bg = Image.new("RGB", (W, H), (17, 24, 39))
     d = ImageDraw.Draw(bg)
-    d.text((24, 18), sc.get("title", "RAWR: operator-controlled antagonistic robot behavior"), font=f_title,
+    d.text((24, 18), sc.get("title", "CRAB: operator-controlled antagonistic robot behavior"), font=f_title,
            fill=(255, 255, 255))
-    note = ("Rehearsal in simulation. Scripted participant: its lines reach RAWR as text"
+    note = ("Rehearsal in simulation. Scripted participant: its lines reach CRAB as text"
             + ("; the voice was added for the viewer." if voiced else ".")
             + (" Real time except the marked pauses." if pauses else " Real time."))
     d.text((24, 64), note, font=f_note, fill=(148, 163, 184))

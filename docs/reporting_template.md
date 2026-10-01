@@ -5,7 +5,7 @@ The numbers below come from the session log. Items marked **[researcher]** are n
 log and must be filled in by hand. This file is a template (`docs/reporting_template.md`):
 edit it to change the report, keeping the `$${name}` placeholders you want filled.
 
-Why report this? In a RAWR study the operator decides what the robot says. Replies are
+Why report this? In a CRAB study the operator decides what the robot says. Replies are
 sent, held, tempered, intensified, or regenerated, so those decisions are part of the
 manipulation and belong in the paper next to the condition itself.
 

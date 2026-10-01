@@ -62,11 +62,11 @@ class FurhatConfig:
     """Furhat Remote API (robot or virtual Furhat, port 54321)."""
     host: str = "localhost"
     voice: Optional[str] = None
-    tts_engine: str = "furhat"          # furhat (robot's own voice) | kokoro | system: audio from RAWR, lip-synced
+    tts_engine: str = "furhat"          # furhat (robot's own voice) | kokoro | system: audio from CRAB, lip-synced
     tts_voice: Optional[str] = None     # voice for kokoro/system, e.g. "am_michael"
     tts_rate: Optional[int] = None      # words per minute for kokoro/system (175 = normal)
     audio_host: Optional[str] = None    # address of this computer as the robot sees it (default: auto)
-    audio_port: int = 8095              # port on which RAWR serves the audio to the robot
+    audio_port: int = 8095              # port on which CRAB serves the audio to the robot
     speech_log_dir: Optional[str] = None  # kokoro/system only: archive each utterance as played (WAV + JSONL)
 
 

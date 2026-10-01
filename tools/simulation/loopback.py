@@ -1,6 +1,6 @@
 """Record what the computer's speakers play (WASAPI loopback, Windows; pip install pyaudiowpatch).
 
-Used for the virtual Furhat, whose voice is played by the Furhat SDK and never reaches RAWR.
+Used for the virtual Furhat, whose voice is played by the Furhat SDK and never reaches CRAB.
 compose.py keeps this track only while the robot was speaking (from the session database), so other
 sounds on the computer are dropped. Gaps (the loopback delivers nothing while the speakers are
 silent) are filled with zeros on the wall clock.

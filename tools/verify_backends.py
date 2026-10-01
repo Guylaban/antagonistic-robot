@@ -1,6 +1,6 @@
 """Verify a robot setup: the gate's release rules, failed checks, Stop speech, and End session.
 
-Runs the real RAWR pipeline (prompt compiler, review gate, logging) on the robot backend you choose,
+Runs the real CRAB pipeline (prompt compiler, review gate, logging) on the robot backend you choose,
 with scripted participant lines, scripted replies, and scripted monitor and judge results, so that
 each case is controlled and needs no API key:
 
@@ -8,7 +8,7 @@ each case is controlled and needs no API key:
     2. a reply the monitor flags -> held until the operator sends it
     3. the monitor fails         -> held ("monitor unavailable")
     4. the judge fails           -> held ("fidelity judge unavailable")
-    5. a long reply              -> Stop speech mid-utterance returns control to RAWR
+    5. a long reply              -> Stop speech mid-utterance returns control to CRAB
     6. End session while a reply waits -> the reply is withheld and the session closes
 
     python tools/verify_backends.py --robot text
@@ -16,7 +16,7 @@ each case is controlled and needs no API key:
     python tools/verify_backends.py --robot furhat                      # Remote API skill running
     python tools/verify_backends.py --robot reachy_mini                 # daemon (or --sim) running
 
-Writes to --out (new folder): session.db (everything RAWR logged), checks.jsonl (one line per check:
+Writes to --out (new folder): session.db (everything CRAB logged), checks.jsonl (one line per check:
 expected, observed, pass) and summary.json. Uses your config.yaml for the robot settings.
 """
 import argparse
@@ -211,7 +211,7 @@ def main():
     th.join(30)
     control_s = round(time.monotonic() - t_stop, 3)
     r = box.get("t")
-    check("stop_speech", "control returns to RAWR at once; the turn is logged as not completed",
+    check("stop_speech", "control returns to CRAB at once; the turn is logged as not completed",
           f"speaking={bool(spoke)}; robot.stop() returned {stopped}; control returned in {control_s} s; "
           f"speech_completed logged as {logger.export_session(sid)['turns'][-1]['speech_completed'] if r else None}",
           bool(spoke) and r is not None and control_s < 1.0, control_return_s=control_s, robot_stop_returned=stopped)

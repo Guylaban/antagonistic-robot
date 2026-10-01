@@ -11,7 +11,7 @@ participant:
     - Okay, so what would you do instead?
     - I guess I could ask everyone what they are best at first.
 
-robot_voice:                 # used when the backend speaks with a voice RAWR chooses
+robot_voice:                 # used when the backend speaks with a voice CRAB chooses
   reachy_mini: af_heart      # Kokoro voice (needs reachy_mini.tts_engine: kokoro)
   furhat: AndrewMultilingualNeural   # one of the robot's own voices
 
@@ -64,7 +64,7 @@ captions:
     essential: true
   t2_review:
     title: Hold, then Temper
-    body: "For reply 2 the operator presses Hold to stop the timer, reads it, and presses Temper: RAWR regenerates it one level milder (+2 to +1), for this reply only."
+    body: "For reply 2 the operator presses Hold to stop the timer, reads it, and presses Temper: CRAB regenerates it one level milder (+2 to +1), for this reply only."
     highlight: [pending, temper]
     pause: 4.5
     essential: true

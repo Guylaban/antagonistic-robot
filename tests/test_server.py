@@ -10,7 +10,7 @@ def test_console_session_flow(make_manager):
     manager, llm, logger, _ = make_manager(["I think we should split the work equally.", "It seems fair."],
                                            ["That is simplistic.", "Fair is not effective."], review_mode="manual")
     with TestClient(create_app(manager, logger)) as client:
-        assert "RAWR" in client.get("/").text
+        assert "CRAB" in client.get("/").text
 
         sid = client.post("/api/session/start", json={
             "participant_id": "P9", "polar_level": 2, "category": "D", "subtype": 2, "modifiers": ["M2", "M4"],

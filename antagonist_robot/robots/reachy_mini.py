@@ -5,7 +5,7 @@ offline on the computer (tts_engine: "system" = SAPI / espeak-ng, or
 "kokoro" = neural TTS, see robots/tts.py) and streamed to the robot's
 speaker through the SDK in 0.1 s chunks, sentence by sentence, which
 makes stop() take effect within one chunk. Listening uses the robot's
-microphones through the SDK (RAWR runs VAD and ASR locally).
+microphones through the SDK (CRAB runs VAD and ASR locally).
 
 Non-verbal cues (robot.expressions, on by default) use the head and
 antennas, lean, and body turn, and follow the reply being spoken: the pose,
@@ -23,7 +23,7 @@ animate: false it only switches between fixed poses.
 Works with the physical robot and with the MuJoCo simulation
 (`reachy-mini-daemon --sim`; the simulation uses the computer's default
 microphone and speaker in place of the robot's). The daemon's HTTP port defaults to 8000,
-the same as RAWR's console, so run the console on another port
+the same as CRAB's console, so run the console on another port
 (server.port in config.yaml) when both are on one computer.
 """
 

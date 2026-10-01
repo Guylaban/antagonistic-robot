@@ -1,11 +1,11 @@
 ![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue)
 ![Robots](https://img.shields.io/badge/robots-NAO%20%7C%20Pepper%20%7C%20Furhat%20%7C%20Reachy%20Mini-orange)
 
-# RAWR: Robotic Antagonism Workbench for Research
+# CRAB: Controlled Robotic Antagonistic Behaviour Toolkit
 
-RAWR is an operator console for running user studies in which a social robot behaves in controlled antagonistic ways, for example dismissive, sarcastic, or confrontational, while a trained researcher keeps control of every word the robot says. It drives SoftBank NAO and Pepper, Furhat, and Reachy Mini through one backend interface.
+CRAB is an operator console for running user studies in which a social robot behaves in controlled antagonistic ways, for example dismissive, sarcastic, or confrontational, while a trained researcher keeps control of every word the robot says. It drives SoftBank NAO and Pepper, Furhat, and Reachy Mini through one backend interface.
 
-The participant talks to the robot, and the robot listens and speaks: RAWR hears the participant through the robot's microphones (NAO/Pepper and Reachy Mini: streamed to local speech recognition; Furhat: the robot's own recognizer), compiles the operator's current behavioral parameters into a natural-language prompt, and asks an LLM for one reply. **The reply is not spoken until it passes the operator review gate.** Two kinds of signals are computed while it is held:
+The participant talks to the robot, and the robot listens and speaks: CRAB hears the participant through the robot's microphones (NAO/Pepper and Reachy Mini: streamed to local speech recognition; Furhat: the robot's own recognizer), compiles the operator's current behavioral parameters into a natural-language prompt, and asks an LLM for one reply. **The reply is not spoken until it passes the operator review gate.** Two kinds of signals are computed while it is held:
 
 - **too harsh?** a deterministic safety scanner, a configuration risk rating, participant distress cues, and an optional psychosocial risk monitor;
 - **too soft?** an optional fidelity monitor (an LLM judge and an offline detector from the RAGE benchmark) that checks whether the reply actually enacts the requested behavior or has been softened.
@@ -29,7 +29,7 @@ python main.py --robot text --script examples/demo_script.yaml
 
 then open http://localhost:8000, set the matrix (e.g. D, I2, +2), and press **Start**. A scripted participant talks to a robot whose replies are printed; each reply waits in the review panel for **Send**, **Temper**, or the timer. The expected behavior is listed under [Demo without a robot](#demo-without-a-robot-about-5-minutes). Without running anything, `examples/demo_sessions/` holds three recorded sessions (JSON and CSV, one row per candidate reply), and two recorded videos of complete sessions with a simulated Furhat and Reachy Mini accompany the paper. To try the study with a simulated robot, see [Talking to a simulated robot](#talking-to-a-simulated-robot).
 
-![RAWR operator console](docs/operator_console.png)
+![CRAB operator console](docs/operator_console.png)
 
 *The console driving a virtual Furhat (Confrontational, then Passive-Aggressive at intensity 1, polar level +1, Gaslighting and Condescending). The previous reply was tempered from +2 to +1 before it was spoken. The pending reply is held because the psychosocial monitor rates it as clearly insulting; the fidelity judge rates it 8/10 as Passive-Aggressive at intensity 1, as requested. The header warns that Stop speech is unverified on this robot.*
 
@@ -48,7 +48,7 @@ robot microphones ─► Silero VAD ─► faster-whisper (local) ─► prompt 
                         └─ Hold: cancel auto-send
 ```
 
-The pipeline is sequential; each stage completes before the next starts. The robot's microphone is only streamed while the participant may speak, so the robot's own speech is never transcribed. With NAO/Pepper and Reachy Mini, participant audio goes from the robot to this computer only (VAD and ASR run locally); with Furhat, recognition happens in Furhat's own speech service and no audio reaches RAWR. Transcripts are sent to the configured LLM provider (and, if enabled, the monitor and judge providers). `audio.input: computer` switches to the computer's microphone as a fallback.
+The pipeline is sequential; each stage completes before the next starts. The robot's microphone is only streamed while the participant may speak, so the robot's own speech is never transcribed. With NAO/Pepper and Reachy Mini, participant audio goes from the robot to this computer only (VAD and ASR run locally); with Furhat, recognition happens in Furhat's own speech service and no audio reaches CRAB. Transcripts are sent to the configured LLM provider (and, if enabled, the monitor and judge providers). `audio.input: computer` switches to the computer's microphone as a fallback.
 
 ## Operator controls
 
@@ -109,7 +109,7 @@ The console shows requested vs. exhibited behavior and a per-turn fidelity trend
 
 Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows whether the backend's Stop speech is verified.
 
-`python tools/verify_backends.py --robot <backend>` then checks the whole setup with no API key: a clear reply is released by the timer, a reply the monitor flags is held until the operator sends it, a failed monitor or judge holds the reply, Stop speech interrupts a long reply and returns control to RAWR, and End session withholds a pending reply. It uses scripted replies and scripted check results on your real robot backend and writes `session.db`, `checks.jsonl`, and `summary.json` to a new folder under `runs/`.
+`python tools/verify_backends.py --robot <backend>` then checks the whole setup with no API key: a clear reply is released by the timer, a reply the monitor flags is held until the operator sends it, a failed monitor or judge holds the reply, Stop speech interrupts a long reply and returns control to CRAB, and End session withholds a pending reply. It uses scripted replies and scripted check results on your real robot backend and writes `session.db`, `checks.jsonl`, and `summary.json` to a new folder under `runs/`.
 
 Non-verbal cues (`robot.expressions`, on by default) follow the reply being spoken. The expression comes from the category the fidelity judge finds in the reply (a reply it finds neutral or refusing gets neutral body language, even under an antagonistic condition); without the judge, from the requested category. Its strength follows the antagonism level: the mean of the reply's intensity (the judge's enacted intensity, else the requested intensity class) and the polar level, each out of 3; supportive replies scale with |polar level|. Furhat plays a mild-to-strong sequence of built-in gestures (e.g. Aggressive: BrowFrown, Shake, ExpressAnger; Sarcastic: BrowRaise, Smile, Roll); a mild reply gets only the first, a strong one all of them and more often. It looks thoughtful while a reply is prepared and uses the LED ring. Reachy Mini (with `reachy_mini.animate: true`, the default) moves continuously: it eases into a head and antenna pose per state and reply, breathes and glances while listening, and nods and moves its antennas with the loudness of its own speech, in a style chosen from the expression (sharp beats for Confrontational, asymmetric antennas for Sarcastic, low energy for Dismissive) and scaled by the strength. Set `robot.expressions: false` for a study whose manipulation must be verbal only. The mappings (`DEFAULT_GESTURES`, `DEFAULT_POSES`, `DEFAULT_STYLES`) are in `robots/furhat.py` and `robots/reachy_mini.py`; the expression and strength rules are in `robots/base.py`.
 
@@ -126,7 +126,7 @@ Non-verbal cues (`robot.expressions`, on by default) follow the reply being spok
 ## Installation
 
 ```bash
-git clone <repository-url> rawr && cd rawr
+git clone <repository-url> crab && cd crab
 python -m venv venv
 venv\Scripts\activate            # Windows;  source venv/bin/activate on macOS/Linux
 pip install -r requirements.txt
@@ -165,7 +165,7 @@ Before moving to a physical robot, you can run the study digitally: speak to a s
 and operate it from the console exactly as in the lab (Send, Temper, Hold, condition changes,
 Stop speech). The session is logged like a real one.
 
-**Reachy Mini (MuJoCo).** The simulator has no microphones, so RAWR hears you through the
+**Reachy Mini (MuJoCo).** The simulator has no microphones, so CRAB hears you through the
 computer's microphone.
 
 ```bash
@@ -225,7 +225,7 @@ The console binds to `127.0.0.1` by default and has no authentication; do not ex
 ## Reporting a study
 
 The operator's decisions shape what participants hear, so they are part of the manipulation
-and belong in the paper. RAWR writes a study report from the session database:
+and belong in the paper. CRAB writes a study report from the session database:
 
 ```
 python tools/study_report.py "data/Antagonistic Robot.db" --title "Study 1"
@@ -261,7 +261,7 @@ operator training, and the participants' own manipulation-check answers, are mar
 | `llm` | `base_url`, `model`, `max_tokens` (256), `temperature` (0.9), `api_key_env` |
 | `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (true) |
 | `nao` | `ip` (`nao.local`, resolved each connection), `port` (9600), `naoqi_port`, `password` |
-| `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat` for the robot's own lip-synced voices; `kokoro`/`system` play RAWR's audio), `tts_voice`, `audio_host`, `audio_port` (8095) |
+| `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat` for the robot's own lip-synced voices; `kokoro`/`system` play CRAB's audio), `tts_voice`, `audio_host`, `audio_port` (8095) |
 | `reachy_mini` | `host`, `port` (8000, the daemon's), `connection_mode`, `tts_engine` (`system`/`kokoro`), `tts_rate`, `tts_voice` (SAPI voice name, or a Kokoro voice such as `af_heart`), `tts_device`, `animate` (true), `speech_log_dir` |
 | `avct` | default polar level, category, intensity class |
 | `operator` | `review_mode` (`timed`/`manual`), `hold_seconds` (3.0), `block_auto_send_at` (`Orange`), `model_can_end_session` (false) |
@@ -336,16 +336,16 @@ examples/                    demo script and demo sessions
 tests/                       offline test suite
 ```
 
-## Extending RAWR
+## Extending CRAB
 
-- **A new robot.** Subclass `RobotBackend` (`antagonist_robot/robots/base.py`): implement `connect`, `speak` (blocking; returns False if interrupted), and `stop`, and provide listening through `mic_source()` (the robot's microphone; RAWR runs VAD and ASR) or `recognizer()` (the robot's own speech recognition). State cues (`on_listening`, `on_thinking`, `on_idle`) and non-verbal cues are optional. Register the backend in `create_backend` (`antagonist_robot/robots/__init__.py`), add its settings to `config.yaml`, then run `python tools/robot_smoke_test.py --robot <name>` to measure whether Stop speech works. `robots/furhat.py` and `robots/reachy_mini.py` are compact examples of the two listening styles.
+- **A new robot.** Subclass `RobotBackend` (`antagonist_robot/robots/base.py`): implement `connect`, `speak` (blocking; returns False if interrupted), and `stop`, and provide listening through `mic_source()` (the robot's microphone; CRAB runs VAD and ASR) or `recognizer()` (the robot's own speech recognition). State cues (`on_listening`, `on_thinking`, `on_idle`) and non-verbal cues are optional. Register the backend in `create_backend` (`antagonist_robot/robots/__init__.py`), add its settings to `config.yaml`, then run `python tools/robot_smoke_test.py --robot <name>` to measure whether Stop speech works. `robots/furhat.py` and `robots/reachy_mini.py` are compact examples of the two listening styles.
 - **Behavior definitions.** The category, intensity, and modifier texts the prompt compiler writes into every system prompt are plain strings in `antagonist_robot/conversation/avct_manager.py` (`CATEGORY_DEFINITIONS`, `SUBTYPE_DEFINITIONS`, `MODIFIER_DEFINITIONS`). Changing their wording needs no other change; adding a category also needs an entry in the console's `CATS` list (`antagonist_robot/ui/static/index.html`) and a risk mapping in `config_risk` (`conversation/safety.py`).
 - **Policy, thresholds, and models.** Review mode, hold window, release threshold, the judge's blocking threshold, and the generation, monitor, and judge models are all in `config.yaml` (see Configuration).
 - **A new background signal.** Follow the monitor and the judge in `antagonist_robot/conversation/manager.py`: start the signal when a reply is generated, add its name to the signals the gate waits for (`await_signals` in `OperatorGate.open`), and when it finishes, call `escalate(candidate_id, reason)` to hold the reply with a reason the console shows, then `signal_done(candidate_id, name)`.
 
 ## Responsible use
 
-RAWR produces behavior intended to be unpleasant. It is research infrastructure for studies approved by an ethics board, not a template for deployed robots.
+CRAB produces behavior intended to be unpleasant. It is research infrastructure for studies approved by an ethics board, not a template for deployed robots.
 
 - Run it only with informed consent, a debriefing, and a trained operator watching the console for the whole session.
 - Keep `block_auto_send_at` at Orange or lower, or use Manual review, for antagonistic conditions; use Manual review with vulnerable groups (children, older adults, people with mental-health conditions).
@@ -370,10 +370,10 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 | An old IP stops answering | On a direct cable the robot's `169.254.x.x` address changes between sessions; keep `nao.ip: "nao.local"`. |
 | `deploy_nao.py`: authentication failed | Set `nao.password` in `config.yaml`. |
 | `deploy_nao.py`: naoqi module not found | Find it on the robot (`find / -name naoqi.py 2>/dev/null`) and pass `--pythonpath <folder>`. |
-| `main.py`: speaker server not reachable, or unexpected reply | Run `python deploy_nao.py` (also after updating RAWR: older speaker servers do not answer `__PING__`). |
+| `main.py`: speaker server not reachable, or unexpected reply | Run `python deploy_nao.py` (also after updating CRAB: older speaker servers do not answer `__PING__`). |
 | Robot speaks but nobody is heard | `deploy_nao.py` again (older speaker servers have no microphone stream); `python deploy_nao.py --log` shows `Microphone stream unavailable` if ALAudioDevice failed. |
 | Robot silent, console shows an error | `python deploy_nao.py --log` shows why; `python deploy_nao.py` restarts it. |
 
 ## License
 
-RAWR is released under the [MIT License](LICENSE). Third-party components (Silero VAD, faster-whisper, FastAPI, NAOqi, the Furhat Remote API, the Reachy Mini SDK) are used under their own licenses.
+CRAB is released under the [MIT License](LICENSE). Third-party components (Silero VAD, faster-whisper, FastAPI, NAOqi, the Furhat Remote API, the Reachy Mini SDK) are used under their own licenses.

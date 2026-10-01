@@ -1,4 +1,4 @@
-"""Write a study report (report.md and report.json) from a RAWR session database.
+"""Write a study report (report.md and report.json) from a CRAB session database.
 
     python tools/study_report.py data/sessions.db
     python tools/study_report.py data/sessions.db --participants P01 P02 --title "Pilot"
@@ -24,7 +24,7 @@ def main() -> None:
     ap.add_argument("db", help="session database (logging.db_path in config.yaml)")
     ap.add_argument("--sessions", nargs="*", help="only these session IDs")
     ap.add_argument("--participants", nargs="*", help="only these participant IDs")
-    ap.add_argument("--title", default="RAWR study report")
+    ap.add_argument("--title", default="CRAB study report")
     ap.add_argument("--template", help="Markdown template (default docs/reporting_template.md)")
     ap.add_argument("--out", help="output folder (default reports/<timestamp>); must not exist yet")
     args = ap.parse_args()
