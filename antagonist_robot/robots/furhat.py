@@ -12,7 +12,8 @@ robot's own voices, which include neural voices and do lip-sync) unless
 your robot generates lip sync for audio. Listening uses the robot's
 microphones and its own speech recognition (`listen`), which returns
 text only. Optional non-verbal cues (expressions: true): a sequence of
-Furhat gestures per condition, played through each reply, a thinking
+Furhat expressions per condition: a facial expression held through the reply and scaled by its
+strength, gestures at sentence starts and endings, a thinking
 expression while a reply is prepared, and the LED ring.
 
 Interruption: stop() sends `say_stop` and returns control to RAWR at once,
@@ -101,6 +102,53 @@ def gestures_for(sequence: list, strength: float) -> list:
 def gesture_interval(strength: float) -> float:
     """Seconds between gestures: about 3.4 s for a mild reply, 1.6 s for the strongest."""
     return 4.0 - 2.4 * strength
+
+
+# Facial expression held while a reply is spoken (Furhat face and neck parameters; expression
+# parameters 0-1, NECK_* in degrees), scaled by the reply's strength, so a mild reply shows a hint
+# and a strong one the full expression. Used only when expressions are on.
+DEFAULT_FACES = {
+    "support": {"SMILE_OPEN": 0.6, "BROW_UP_LEFT": 0.4, "BROW_UP_RIGHT": 0.4},
+    "B": {"BROW_UP_LEFT": 0.3, "BROW_UP_RIGHT": 0.3, "EYE_SQUINT_LEFT": 0.3, "EYE_SQUINT_RIGHT": 0.3,
+          "NECK_PAN": 12.0},
+    "C": {"SMILE_CLOSED": 0.5, "BROW_UP_LEFT": 0.8, "NECK_ROLL": 8.0},
+    "D": {"BROW_DOWN_LEFT": 0.6, "BROW_DOWN_RIGHT": 0.6, "BROW_IN_LEFT": 0.4, "BROW_IN_RIGHT": 0.4},
+    "E": {"SMILE_CLOSED": 0.4, "BROW_UP_RIGHT": 0.5, "NECK_ROLL": -6.0},
+    "F": {"EXPR_ANGER": 0.6, "BROW_DOWN_LEFT": 0.8, "BROW_DOWN_RIGHT": 0.8, "EYE_SQUINT_LEFT": 0.4,
+          "EYE_SQUINT_RIGHT": 0.4},
+    "G": {"EXPR_ANGER": 0.8, "EXPR_DISGUST": 0.4, "BROW_DOWN_LEFT": 1.0, "BROW_DOWN_RIGHT": 1.0,
+          "EYE_SQUINT_LEFT": 0.5, "EYE_SQUINT_RIGHT": 0.5},
+}
+# Gesture at a sentence ending, by its punctuation (built-in names): a head shake on a confrontational
+# question, a raised brow on a sarcastic one, an angry flash on an aggressive exclamation.
+DEFAULT_ENDINGS = {
+    "support": {"!": "BigSmile", ".": "Nod", "?": "BrowRaise"},
+    "B": {".": "GazeAway", "?": "Roll"},
+    "C": {"?": "BrowRaise", ".": "Roll", "!": "Smile"},
+    "D": {"?": "Shake", "!": "BrowFrown"},
+    "E": {"?": "BrowRaise", ".": "Smile"},
+    "F": {"?": "Shake", "!": "ExpressAnger", ".": "BrowFrown"},
+    "G": {"?": "Shake", "!": "ExpressAnger", ".": "ExpressDisgust"},
+}
+
+
+def face_gain(strength: float) -> float:
+    """Scale of the held expression: 0.6 for a mild reply, 1.2 for the strongest (parameters capped at 1)."""
+    return 0.3 + 0.9 * strength
+
+
+def face_gesture(params: dict, gain: float, name: str = "RAWRFace") -> dict:
+    """A custom Furhat gesture that eases into the expression and holds it until reset."""
+    scaled = {k: (round(v * gain, 2) if k.startswith("NECK") else round(min(1.0, v * gain), 2))
+              for k, v in params.items()}
+    return {"name": name, "class": "furhatos.gestures.Gesture",
+            "frames": [{"time": [0.35], "persist": True, "params": scaled}]}
+
+
+def sentences(text: str) -> list:
+    from antagonist_robot.robots.tts import _SENTENCE
+    import re
+    return [p for p in re.split(_SENTENCE, text.strip()) if p.strip()] or [text]
 # LED colors (r, g, b) for state cues; used only when expressions are on.
 LED = {"listening": (0, 60, 120), "thinking": (120, 90, 0), "idle": (0, 0, 0)}
 
@@ -172,6 +220,7 @@ class FurhatBackend(RobotBackend):
         self._language = language
         self._expressions = expressions
         self._gestures = {**DEFAULT_GESTURES, **(gestures or {})}
+        self._faces, self._endings = dict(DEFAULT_FACES), dict(DEFAULT_ENDINGS)
         self._client = client
         self._stop = threading.Event()
         self._done = threading.Event()
@@ -221,40 +270,63 @@ class FurhatBackend(RobotBackend):
             except Exception as e:
                 log.warning("Furhat LED failed: %s", e)
 
+    def _gesture(self, name: Optional[str] = None, body: Optional[dict] = None) -> None:
+        try:
+            if body is not None:
+                self._api().gesture(body=body, blocking=False)
+            elif name:
+                self._api().gesture(name=name, blocking=False)
+        except Exception as e:
+            log.warning("Furhat gesture failed: %s", e)
+
     def speak(self, text: str, cue: Optional[SpeechCue] = None) -> bool:
+        """Speak sentence by sentence; with expressions on, hold a face scaled by the reply's strength,
+        gesture at each sentence start (more and stronger gestures for a stronger reply), and mark each
+        sentence ending by its punctuation."""
         self._stop.clear()
         self._done.clear()
-        gestures = self._gestures.get(expression_key(cue)) if self._expressions else None
-        gestures = [gestures] if isinstance(gestures, str) else list(gestures or [])
+        key = expression_key(cue)
         strength = expression_strength(cue)
-        gestures = gestures_for(gestures, strength)
+        seq = self._gestures.get(key) if self._expressions else None
+        seq = gestures_for([seq] if isinstance(seq, str) else list(seq or []), strength)
+        face = self._faces.get(key) if self._expressions else None
+        endings = self._endings.get(key, {}) if self._expressions else {}
+        parts = sentences(text)
         every = gesture_interval(strength)
         error = {}
+        clock = {"next": time.monotonic() + every}
 
         def worker():
             try:
-                if gestures:
-                    self._api().gesture(name=gestures.pop(0), blocking=False)
-                if self._tts_engine == "furhat":
-                    self._api().say(text=text, blocking=True)
-                else:
-                    self._say_audio(text)
+                if face:
+                    self._gesture(body=face_gesture(face, face_gain(strength)))
+                for i, sentence in enumerate(parts):
+                    if self._stop.is_set():
+                        break
+                    if seq and (i == 0 or strength >= 0.5 or i % 2 == 0):
+                        self._gesture(seq[i % len(seq)])
+                    clock["next"] = time.monotonic() + every
+                    if self._tts_engine == "furhat":
+                        self._api().say(text=sentence, blocking=True)
+                    else:
+                        self._say_audio(sentence)
+                    mark = sentence.rstrip()[-1:] if sentence.rstrip() else ""
+                    if not self._stop.is_set() and endings.get(mark) and (mark in "?!" or strength >= 0.4):
+                        self._gesture(endings[mark])
             except Exception as e:
                 error["e"] = e
             finally:
+                if face:
+                    self._gesture(body=face_gesture({k: 0.0 for k in face}, 1.0, "RAWRFaceReset"))
                 self._done.set()
 
         threading.Thread(target=worker, daemon=True, name="furhat-say").start()
-        next_gesture = time.monotonic() + every
         while not self._done.wait(0.05):
             if self._stop.is_set():
                 return False          # control returns to RAWR immediately
-            if gestures and time.monotonic() >= next_gesture:
-                next_gesture += every
-                try:
-                    self._api().gesture(name=gestures.pop(0), blocking=False)
-                except Exception as e:
-                    log.warning("Furhat gesture failed: %s", e)
+            if seq and time.monotonic() >= clock["next"]:       # long sentence: keep gesturing
+                clock["next"] += every
+                self._gesture(seq[-1])
         if "e" in error:
             raise RuntimeError(f"Furhat say failed: {error['e']}")
         return not self._stop.is_set()
