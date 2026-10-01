@@ -146,6 +146,7 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
             req.modifiers if req.modifiers is not None else cur["modifiers"],
             source="operator",
         )
+        ws_manager.broadcast({"type": "settings", **manager.settings()})   # keeps every open console in sync
         return manager.settings()
 
     # --- operator review --------------------------------------------------------
@@ -195,7 +196,8 @@ def create_app(manager: ConversationManager, session_logger: SessionLogger) -> F
             session_id = manager.start_session(
                 req.polar_level, req.category, req.subtype, req.modifiers, req.participant_id
             )
-            ws_manager.broadcast({"type": "session_started", "session_id": session_id, **manager.settings()})
+            ws_manager.broadcast({"type": "session_started", "session_id": session_id,
+                                  "participant_id": req.participant_id, **manager.settings()})
 
             def conversation_loop():
                 consecutive_errors = 0

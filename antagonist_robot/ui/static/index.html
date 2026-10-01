@@ -264,6 +264,22 @@ $("startBtn").onclick = async () => {
   $("sessionId").textContent = r.session_id; $("log").innerHTML = ""; $("startBtn").disabled = true; $("endBtn").disabled = false;
   $("jsonBtn").disabled = $("csvBtn").disabled = false; $("distress").classList.remove("show"); renderMatrix();
 };
+// Another console (or a rehearsal driver) started the session or changed the condition: show it here.
+function syncSession(ev) {
+  if (S.session === ev.session_id) return;
+  S.polar = ev.polar_level; S.cat = ev.category; S.sub = ev.subtype; S.mods = ev.modifiers;
+  S.running = true; S.session = ev.session_id; S.applied = [S.polar, S.cat, S.sub, [...S.mods].sort()];
+  $("sessionId").textContent = ev.session_id; $("pid").value = ev.participant_id || ""; $("log").innerHTML = "";
+  $("startBtn").disabled = true; $("endBtn").disabled = false; $("jsonBtn").disabled = $("csvBtn").disabled = false;
+  $("distress").classList.remove("show"); renderMatrix();
+}
+function syncSettings(ev) {
+  const shown = JSON.stringify([S.polar, S.cat, S.sub, [...S.mods].sort()]);
+  const unapplied = S.applied && shown !== JSON.stringify(S.applied);       // keep this console's own edits
+  S.applied = [ev.polar_level, ev.category, ev.subtype, [...ev.modifiers].sort()];
+  if (!unapplied) { S.polar = ev.polar_level; S.cat = ev.category; S.sub = ev.subtype; S.mods = ev.modifiers; }
+  renderMatrix();
+}
 $("endBtn").onclick = async () => {
   if (!confirm("End the session now? Robot speech is interrupted and any pending response is withheld.")) return;
   await api("/api/session/stop", {}); sessionEnded("ended by operator");
@@ -396,6 +412,8 @@ function connect() {
     else if (ev.type === "turn_complete") { renderLatency(ev.latency); $("turnNo").textContent = ev.turn_number; }
     else if (ev.type === "speech_stopped") addNote(ev.stopped ? "Robot speech stopped by operator." : "Stop sent (robot was not speaking).");
     else if (ev.type === "session_ended") { if (S.running) sessionEnded(ev.reason || "ended"); }
+    else if (ev.type === "session_started") syncSession(ev);
+    else if (ev.type === "settings") syncSettings(ev);
     else if (ev.type === "error") addNote("Error: " + ev.message);
     else if (ev.type === "end_suggested") addNote("The model suggested ending the conversation here. The session continues; use End session to stop.");
   };
