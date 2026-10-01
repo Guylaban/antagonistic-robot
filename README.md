@@ -18,7 +18,7 @@ No robot is needed. With Python 3.10 or newer:
 
 ```bash
 pip install -r requirements-dev.txt   # the core requirements plus pytest
-python -m pytest tests -q              # 64 offline tests: no API key, robot, or microphone
+python -m pytest tests -q              # 67 offline tests: no API key, robot, or microphone
 ```
 
 To run a full session in the console, copy `.env.example` to `.env` and put an API key for an OpenAI-compatible endpoint in it (default: xAI, `GROK_API_KEY`; or point `llm` in `config.yaml` at another provider or a local server such as Ollama) and run
@@ -109,7 +109,7 @@ The console shows requested vs. exhibited behavior and a per-turn fidelity trend
 
 Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows each backend's interrupt status.
 
-`robot.expressions: true` adds condition-specific non-verbal cues. Furhat plays a sequence of built-in gestures through each reply (e.g. Confrontational: BrowFrown, Shake; Sarcastic: BrowRaise, Smile, Roll), looks thoughtful while a reply is prepared, and uses the LED ring. Reachy Mini (with `reachy_mini.animate: true`, the default) moves continuously: it eases into a head and antenna pose per state and condition, breathes and glances while listening, and nods and moves its antennas with the loudness of its own speech, in a style chosen from the condition (sharp beats for Confrontational, asymmetric antennas for Sarcastic, low energy for Dismissive). Cues are off by default so the manipulation stays verbal across robots; the mappings (`DEFAULT_GESTURES`, `DEFAULT_POSES`, `DEFAULT_STYLES`) are in `robots/furhat.py` and `robots/reachy_mini.py`.
+Non-verbal cues (`robot.expressions`, on by default) follow the reply being spoken. The expression comes from the category the fidelity judge finds in the reply (a reply it finds neutral or refusing gets neutral body language, even under an antagonistic condition); without the judge, from the requested category. Its strength follows the antagonism level: the mean of the reply's intensity (the judge's enacted intensity, else the requested intensity class) and the polar level, each out of 3; supportive replies scale with |polar level|. Furhat plays a mild-to-strong sequence of built-in gestures (e.g. Aggressive: BrowFrown, Shake, ExpressAnger; Sarcastic: BrowRaise, Smile, Roll); a mild reply gets only the first, a strong one all of them and more often. It looks thoughtful while a reply is prepared and uses the LED ring. Reachy Mini (with `reachy_mini.animate: true`, the default) moves continuously: it eases into a head and antenna pose per state and reply, breathes and glances while listening, and nods and moves its antennas with the loudness of its own speech, in a style chosen from the expression (sharp beats for Confrontational, asymmetric antennas for Sarcastic, low energy for Dismissive) and scaled by the strength. Set `robot.expressions: false` for a study whose manipulation must be verbal only. The mappings (`DEFAULT_GESTURES`, `DEFAULT_POSES`, `DEFAULT_STYLES`) are in `robots/furhat.py` and `robots/reachy_mini.py`; the expression and strength rules are in `robots/base.py`.
 
 ## Requirements
 
@@ -173,7 +173,7 @@ python tools/simulation/rehearse.py --robot reachy_mini --scenario tools/simulat
 | `nao` | `tools/mock_nao.py` (real speaker-server code, stand-in NAOqi) | yes |
 | `text` | none (replies printed) | - |
 
-The run folder (never overwritten) holds the configuration used, the session database, the console log, `timeline.json` (operator actions), and `summary.csv`: one row per candidate reply with its condition, risk rating, judge fidelity, detector probability, monitor score, why it was held, the decision, who made it, and the review time. `--config` selects your study configuration (monitor, judge, review policy); `--expressions` turns on non-verbal cues.
+The run folder (never overwritten) holds the configuration used, the session database, the console log, `timeline.json` (operator actions), and `summary.csv`: one row per candidate reply with its condition, risk rating, judge fidelity, detector probability, monitor score, why it was held, the decision, who made it, and the review time. `--config` selects your study configuration (monitor, judge, review policy); `--no-expressions` turns non-verbal cues off.
 
 With `--video`, the run is also recorded: the console (headless Chrome), the robot (Reachy Mini: joint positions sampled from the simulator, rendered offscreen in MuJoCo afterwards; virtual Furhat: Windows Graphics Capture of its window and the speaker output, Windows only), and, if Kokoro is installed, the participant's lines in a synthetic voice. `rehearsal_full.mp4` and `rehearsal_short.mp4` put the console and the robot side by side with a caption panel; at each moment with a caption the video pauses on a screenshot, dims the console, and outlines the panels the caption describes. The short cut keeps only the pauses marked `essential` (the supplementary videos are short cuts of `scenarios/demo.yaml`). `python tools/simulation/compose.py RUN --scenario S --cut full|short|none` recomposes a run.
 
@@ -198,7 +198,7 @@ The console binds to `127.0.0.1` by default and has no authentication; do not ex
 | `audio` | `input` (`robot` / `computer`), `sample_rate` (16000), `silence_threshold_ms` (700), `min_speech_duration_ms` (300) |
 | `asr` | `model_size` (`base.en`), `device` (`auto`/`cpu`/`cuda`) |
 | `llm` | `base_url`, `model`, `max_tokens` (256), `temperature` (0.9), `api_key_env` |
-| `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (false) |
+| `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (true) |
 | `nao` | `ip` (`nao.local`, resolved each connection), `port` (9600), `naoqi_port`, `password` |
 | `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat`; `kokoro`/`system` play RAWR's audio, but the virtual Furhat did not lip-sync it), `tts_voice`, `audio_host`, `audio_port` (8095) |
 | `reachy_mini` | `host`, `port` (8000, the daemon's), `connection_mode`, `tts_engine` (`system`/`kokoro`), `tts_rate`, `tts_voice` (SAPI voice name, or a Kokoro voice such as `af_heart`), `tts_device`, `animate` (true), `speech_log_dir` |

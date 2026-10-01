@@ -84,7 +84,7 @@ def test_furhat_cues_only_when_enabled():
     FurhatBackend(client=f, expressions=False).speak("x", SpeechCue(2, "F"))
     assert not any(c[0] == "gesture" for c in f.calls)
     FurhatBackend(client=f, expressions=True).speak("x", SpeechCue(2, "F"))
-    assert ("gesture", "ExpressAnger") in f.calls
+    assert ("gesture", "BrowFrown") in f.calls
 
 
 def test_furhat_connect_errors_clearly():
@@ -298,7 +298,32 @@ def test_furhat_plays_rawr_audio_with_lipsync(tmp_path):
     b._audio.close()
 
 
-def test_furhat_plays_gesture_sequence_through_reply():
-    f = FakeFurhat(say_s=5.3)
-    FurhatBackend(client=f, expressions=True).speak("x", SpeechCue(2, "F"))
-    assert [c[1] for c in f.calls if c[0] == "gesture"] == ["ExpressAnger", "BrowFrown", "Shake"]
+def test_furhat_gestures_follow_the_antagonism_level():
+    strong, mild = FakeFurhat(say_s=3.6), FakeFurhat(say_s=3.6)
+    FurhatBackend(client=strong, expressions=True).speak("x", SpeechCue(3, "F", 3))      # strength 1.0
+    FurhatBackend(client=mild, expressions=True).speak("x", SpeechCue(1, "F", 1))        # strength 0.33
+    assert [c[1] for c in strong.calls if c[0] == "gesture"] == ["BrowFrown", "Shake", "ExpressAnger"]
+    assert [c[1] for c in mild.calls if c[0] == "gesture"] == ["BrowFrown"]
+
+
+def test_expression_follows_the_reply_not_only_the_request():
+    from antagonist_robot.robots.base import expression_strength
+    asked_d = SpeechCue(2, "D", 2)
+    assert expression_key(asked_d) == "D"
+    assert expression_key(SpeechCue(2, "D", 2, exhibited_category="C")) == "C"         # judge saw sarcasm
+    assert expression_key(SpeechCue(3, "F", 3, exhibited_category="NEUTRAL")) == "neutral"   # softened reply
+    assert expression_key(SpeechCue(2, "F", 2, exhibited_category="REFUSAL")) == "neutral"
+    assert expression_strength(SpeechCue(3, "F", 3)) == 1.0
+    assert expression_strength(SpeechCue(1, "D", 1)) == round(1 / 3, 3)
+    assert expression_strength(SpeechCue(3, "F", 3, exhibited_category="F", exhibited_intensity=1)) == round(2 / 3, 3)
+    assert expression_strength(SpeechCue(-3, "D")) == 1.0 and expression_strength(SpeechCue(0, "D")) == 0.0
+
+
+def test_reachy_pose_scales_with_antagonism():
+    from antagonist_robot.robots.reachy_mini import expression_gain
+    strong, mild = fake_reachy(expressions=True), fake_reachy(expressions=True)
+    strong.speak("x", SpeechCue(3, "F", 3))
+    mild.speak("x", SpeechCue(1, "F", 1))
+    first = lambda b: b._mini.poses[0][0]                                     # antennas of the condition pose
+    assert abs(first(strong)[0]) > abs(first(mild)[0])
+    assert expression_gain(SpeechCue(0, "D")) == 1.0 and expression_gain(SpeechCue(3, "F", 3)) == 1.5

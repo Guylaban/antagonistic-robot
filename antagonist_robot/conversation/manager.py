@@ -86,6 +86,7 @@ class ConversationManager:
         self._avct = avct_manager
         self._logger = session_logger
         self._gate = gate
+        self._judged: dict = {}          # candidate id -> fidelity judge result (for non-verbal cues)
         self._safety = safety or SafetyChecker()
         self._monitor = monitor
         self._fidelity = fidelity
@@ -228,6 +229,8 @@ class ConversationManager:
         self._emit({"type": "fidelity", "candidate_id": candidate_id, "source": source,
                     **{k: v for k, v in result.items() if k != "raw"}})
         if source == "judge":
+            if not result.get("error"):
+                self._judged[candidate_id] = result
             reason = self._fidelity.below_threshold(result)
             if reason and self._gate.escalate(candidate_id, reason):
                 self._logger.log_event(session_id, "fidelity_block", turn_number, candidate_id,
@@ -240,6 +243,7 @@ class ConversationManager:
     def start_session(self, polar_level: int, category: str, subtype: int, modifiers: list, participant_id: str) -> str:
         self._session_id = str(uuid.uuid4())[:8]
         self._end_requested = False
+        self._judged = {}
         self.set_avct(polar_level, category, subtype, modifiers)
         self._participant_id = participant_id
         self._turn_count = 0
@@ -439,7 +443,11 @@ class ConversationManager:
         self._set_state(SystemState.SPEAKING)
         self._emit({"type": "speaking", "candidate_id": candidate_id, "response": response_text})
         t3 = time.monotonic()
-        completed = self._robot.speak(response_text, SpeechCue(polar, category, subtype, modifiers))
+        judged = self._judged.pop(candidate_id, None) or {}
+        cue = SpeechCue(polar, category, subtype, modifiers,
+                        exhibited_category=judged.get("matched_category"),
+                        exhibited_intensity=judged.get("intensity_est"))
+        completed = self._robot.speak(response_text, cue)
         latency["speech_ms"] = round((time.monotonic() - t3) * 1000)
         latency["total_ms"] = round((time.monotonic() - t0) * 1000)
         self._history.add_assistant_message(response_text)

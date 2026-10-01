@@ -14,10 +14,13 @@ Listening goes through the robot too. A backend provides one of:
     mic_source()   the robot's microphone as an audio source; RAWR runs VAD + ASR locally
     recognizer()   the robot's own speech recognition (record_utterance / transcribe)
 
-Optional non-verbal cues (`expressions: true` in the backend's config
-section) are chosen from the behavioral condition of the reply being
-spoken. They are off by default so that, across robots, the manipulation
-stays verbal unless a study deliberately adds a non-verbal channel.
+Non-verbal cues (`robot.expressions`, on by default) follow the reply
+being spoken: the expression comes from the category the fidelity judge
+finds in the reply (or, without the judge, the requested category), and
+its strength from the antagonism level, so voice and body express the
+same thing. A reply the judge finds neutral gets neutral body language
+even under an antagonistic condition. Switch cues off for a study whose
+manipulation must be verbal only.
 """
 
 from abc import ABC, abstractmethod
@@ -27,11 +30,14 @@ from typing import Optional
 
 @dataclass
 class SpeechCue:
-    """Behavioral condition of the reply being spoken (for optional non-verbal cues)."""
+    """The reply being spoken, for non-verbal cues: the requested condition and, when the fidelity
+    judge scored the reply, the category (B-G, NEUTRAL, REFUSAL) and intensity (0-3) it actually shows."""
     polar_level: int = 0
     category: Optional[str] = None
     subtype: int = 1
     modifiers: list = field(default_factory=list)
+    exhibited_category: Optional[str] = None
+    exhibited_intensity: Optional[int] = None
 
 
 @dataclass
@@ -50,12 +56,38 @@ class Capabilities:
 
 
 def expression_key(cue: Optional[SpeechCue]) -> str:
-    """Map a condition to an expression key: support, neutral, or a category letter B-G."""
+    """Expression for the reply being spoken: support, neutral, or a category letter B-G.
+
+    Uses the category the judge found in the reply when there is one (NEUTRAL or REFUSAL -> neutral),
+    otherwise the requested category.
+    """
     if cue is None or cue.polar_level == 0:
         return "neutral"
     if cue.polar_level < 0:
         return "support"
+    shown = (cue.exhibited_category or "").upper()
+    if shown in ("B", "C", "D", "E", "F", "G"):
+        return shown
+    if shown in ("NEUTRAL", "REFUSAL"):
+        return "neutral"
     return cue.category or "D"
+
+
+def expression_strength(cue: Optional[SpeechCue]) -> float:
+    """How strongly to express the cue, 0-1: the level of antagonism (or support) in the reply.
+
+    Antagonism: the mean of the intensity (the judge's enacted intensity, else the requested
+    intensity class, 1-3) and the polar level (1-3), each as a fraction of 3. Support: |polar| / 3.
+    Neutral: 0.
+    """
+    key = expression_key(cue)
+    if key == "neutral":
+        return 0.0
+    if key == "support":
+        return min(1.0, abs(cue.polar_level) / 3)
+    intensity = cue.exhibited_intensity if cue.exhibited_intensity is not None else cue.subtype
+    intensity = max(1, min(3, int(intensity or 1)))
+    return round((intensity / 3 + min(3, cue.polar_level) / 3) / 2, 3)
 
 
 class RobotBackend(ABC):

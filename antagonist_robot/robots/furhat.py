@@ -33,7 +33,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from antagonist_robot.pipeline.types import ASRResult, AudioData
-from antagonist_robot.robots.base import Capabilities, RobotBackend, SpeechCue, expression_key
+from antagonist_robot.robots.base import Capabilities, RobotBackend, SpeechCue, expression_key, expression_strength
 
 log = logging.getLogger(__name__)
 
@@ -79,15 +79,28 @@ class FurhatRecognizer:
         text, self._text = self._text or "", None
         return ASRResult(text=text, language=self._language, confidence=0.0, transcription_time_seconds=0.0)
 
-# Gestures per condition (Furhat built-in gesture names), played in turn through each reply, the
-# first as speech starts and then one every GESTURE_EVERY_S; used only when expressions are on.
+# Gestures per expression (Furhat built-in gesture names), ordered from mild to strong. For each reply
+# the cue strength (0-1, the antagonism or support level of the reply) sets how far into the sequence the
+# robot goes and how often it gestures: the first gesture as speech starts, then one every
+# gesture_interval(strength) seconds. Used only when expressions are on.
 DEFAULT_GESTURES = {
     "support": ["Smile", "Nod", "BigSmile"], "neutral": [],
     "B": ["GazeAway", "Roll"], "C": ["BrowRaise", "Smile", "Roll"], "D": ["BrowFrown", "Shake", "BrowFrown"],
-    "E": ["Smile", "BrowRaise"], "F": ["ExpressAnger", "BrowFrown", "Shake"],
-    "G": ["ExpressAnger", "ExpressDisgust", "Shake"],
+    "E": ["Smile", "BrowRaise"], "F": ["BrowFrown", "Shake", "ExpressAnger"],
+    "G": ["BrowFrown", "ExpressDisgust", "ExpressAnger"],
 }
-GESTURE_EVERY_S = 2.5
+
+
+def gestures_for(sequence: list, strength: float) -> list:
+    """The part of a mild-to-strong gesture sequence a reply of this strength uses (at least one)."""
+    if not sequence:
+        return []
+    return list(sequence[:max(1, round(len(sequence) * strength + 0.25))])
+
+
+def gesture_interval(strength: float) -> float:
+    """Seconds between gestures: about 3.4 s for a mild reply, 1.6 s for the strongest."""
+    return 4.0 - 2.4 * strength
 # LED colors (r, g, b) for state cues; used only when expressions are on.
 LED = {"listening": (0, 60, 120), "thinking": (120, 90, 0), "idle": (0, 0, 0)}
 
@@ -213,6 +226,9 @@ class FurhatBackend(RobotBackend):
         self._done.clear()
         gestures = self._gestures.get(expression_key(cue)) if self._expressions else None
         gestures = [gestures] if isinstance(gestures, str) else list(gestures or [])
+        strength = expression_strength(cue)
+        gestures = gestures_for(gestures, strength)
+        every = gesture_interval(strength)
         error = {}
 
         def worker():
@@ -229,12 +245,12 @@ class FurhatBackend(RobotBackend):
                 self._done.set()
 
         threading.Thread(target=worker, daemon=True, name="furhat-say").start()
-        next_gesture = time.monotonic() + GESTURE_EVERY_S
+        next_gesture = time.monotonic() + every
         while not self._done.wait(0.05):
             if self._stop.is_set():
                 return False          # control returns to RAWR immediately
             if gestures and time.monotonic() >= next_gesture:
-                next_gesture += GESTURE_EVERY_S
+                next_gesture += every
                 try:
                     self._api().gesture(name=gestures.pop(0), blocking=False)
                 except Exception as e:

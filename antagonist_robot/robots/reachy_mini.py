@@ -7,13 +7,15 @@ speaker through the SDK in 0.1 s chunks, sentence by sentence, which
 makes stop() take effect within one chunk. Listening uses the robot's
 microphones through the SDK (RAWR runs VAD and ASR locally).
 
-Optional non-verbal cues (expressions: true) use the head and antennas.
-With animate: true (the default when expressions are on) the robot moves
-continuously: it eases into a pose per state and condition, breathes and
-glances while listening, and moves its head and antennas with the
-loudness of its own speech (nods on stressed syllables), in a style
-chosen from the condition. With animate: false it only switches between
-fixed poses.
+Non-verbal cues (robot.expressions, on by default) use the head and
+antennas and follow the reply being spoken: the pose and motion style come
+from the category the judge finds in it (else the requested one), scaled by
+its antagonism level, so a mild reply moves gently and a strong one
+sharply. With animate: true (the default) the robot moves continuously: it
+eases into a pose per state and reply, breathes and glances while
+listening, and moves its head and antennas with the loudness of its own
+speech (nods on stressed syllables). With animate: false it only switches
+between fixed poses.
 
 Works with the physical robot and with the MuJoCo simulation
 (`reachy-mini-daemon --sim`; the simulation uses the computer's default
@@ -33,7 +35,7 @@ from typing import Optional
 
 import numpy as np
 
-from antagonist_robot.robots.base import Capabilities, RobotBackend, SpeechCue, expression_key
+from antagonist_robot.robots.base import Capabilities, RobotBackend, SpeechCue, expression_key, expression_strength
 from antagonist_robot.robots.tts import SystemTTS, create_tts
 
 log = logging.getLogger(__name__)
@@ -91,6 +93,12 @@ def loudness(samples: np.ndarray, sr: int, hop_s: float = 0.02) -> np.ndarray:
     return np.clip((20 * np.log10(rms) + 45) / 33, 0, 1)
 
 
+def expression_gain(cue: Optional[SpeechCue]) -> float:
+    """Scale for poses and motion: 1 for neutral; 0.5 + strength otherwise (about 0.83 mild to 1.5 strong)."""
+    key = expression_key(cue)
+    return 1.0 if key == "neutral" else 0.5 + expression_strength(cue)
+
+
 class Animator:
     """Continuous head and antenna motion for Reachy Mini, streamed with set_target at 50 Hz."""
 
@@ -130,18 +138,22 @@ class Animator:
         if self._thread:
             self._thread.join(1)
 
-    def set_state(self, key: str, duration: float = 0.5, mode: Optional[str] = None) -> None:
+    def set_state(self, key: str, duration: float = 0.5, mode: Optional[str] = None, gain: float = 1.0) -> None:
         if key not in self._poses:
             return
         with self._lock:
-            self._target = self._vec(key)
+            self._target = self._vec(key) * gain
             self._tau = max(0.06, duration / 3)
             if mode:
                 self._mode = mode
 
-    def set_style(self, key: str) -> None:
+    def set_style(self, key: str, gain: float = 1.0) -> None:
+        """Motion style for the reply about to be spoken; gain scales its amplitudes (antagonism level)."""
+        style = dict(self._styles.get(key, self._styles["neutral"]))
+        for k in ("nod", "beat", "sway", "antenna"):
+            style[k] *= gain
         with self._lock:
-            self._style = self._styles.get(key, self._styles["neutral"])
+            self._style = style
             self._mode = "speaking"
 
     def feed(self, samples: np.ndarray, sr: int, t_start: float) -> None:
@@ -298,22 +310,22 @@ class ReachyMiniBackend(RobotBackend):
             self._anim = Animator(self._mini, self._poses, self._styles)
             self._anim.start()
 
-    def _goto(self, key: str, duration: float = 0.6, force: bool = False) -> None:
+    def _goto(self, key: str, duration: float = 0.6, force: bool = False, gain: float = 1.0) -> None:
         from reachy_mini.utils import create_head_pose
-        (roll, pitch, yaw), (a_left, a_right) = self._poses[key]
+        (roll, pitch, yaw), (a_left, a_right) = [[v * gain for v in part] for part in self._poses[key]]
         try:
             self._mini.goto_target(head=create_head_pose(roll=roll, pitch=pitch, yaw=yaw, degrees=True),
                                    antennas=np.deg2rad([a_left, a_right]), duration=duration)
         except Exception as e:
             log.warning("Reachy Mini pose %s failed: %s", key, e)
 
-    def _pose(self, key: str, duration: float = 0.6, mode: Optional[str] = None) -> None:
+    def _pose(self, key: str, duration: float = 0.6, mode: Optional[str] = None, gain: float = 1.0) -> None:
         if not self._expressions or key not in self._poses:
             return
         if self._anim is not None:
-            self._anim.set_state(key, duration, mode)
+            self._anim.set_state(key, duration, mode, gain)
         else:
-            self._goto(key, duration)
+            self._goto(key, duration, gain=gain)
 
     def _stream(self, text: str):
         if hasattr(self._tts, "stream"):
@@ -325,9 +337,10 @@ class ReachyMiniBackend(RobotBackend):
         media = self._mini.media
         sr_out, channels = media.get_output_audio_samplerate(), media.get_output_channels()
         key = expression_key(cue)
-        self._pose(key, 0.4)
+        gain = expression_gain(cue)
+        self._pose(key, 0.4, gain=gain)
         if self._anim is not None:
-            self._anim.set_style(key)
+            self._anim.set_style(key, gain)
 
         parts: queue.Queue = queue.Queue()
 

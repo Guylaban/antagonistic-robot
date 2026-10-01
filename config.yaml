@@ -24,7 +24,7 @@ llm:
 # Which robot speaks the released replies (antagonist_robot/robots/).
 robot:
   backend: "nao"        # nao | furhat | reachy_mini | text (prints replies; no robot)
-  expressions: false    # condition-specific non-verbal cues on Furhat / Reachy Mini (off: verbal-only manipulation)
+  expressions: true     # non-verbal cues (Furhat, Reachy Mini) that follow each reply's category and antagonism level; false = verbal-only manipulation
 
 nao:
   ip: "nao.local"      # mDNS name; resolved on every connection (the cable IP changes per session)

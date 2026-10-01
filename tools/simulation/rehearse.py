@@ -110,8 +110,8 @@ def participant_audio(sc, out: Path, video: bool):
 def make_config(base_path, sc, args, out: Path) -> dict:
     cfg = yaml.safe_load(open(base_path, encoding="utf-8")) or {}
     cfg.setdefault("robot", {})["backend"] = args.robot
-    if args.expressions:
-        cfg["robot"]["expressions"] = True
+    if args.no_expressions:
+        cfg["robot"]["expressions"] = False
     cfg.setdefault("server", {})["port"] = args.port
     cfg.setdefault("logging", {}).update(db_path=str(out / "session.db"), audio_dir=str(out / "audio"))
     voice = (sc.get("robot_voice") or {}).get(args.robot)
@@ -241,7 +241,7 @@ def main():
     ap.add_argument("--config", default=str(ROOT / "config.yaml"), help="base configuration (default: config.yaml)")
     ap.add_argument("--port", type=int, default=8093, help="console port (the Reachy daemon uses 8000)")
     ap.add_argument("--video", action="store_true", help="record the console and the robot and compose a video")
-    ap.add_argument("--expressions", action="store_true", help="turn on non-verbal cues (robot.expressions)")
+    ap.add_argument("--no-expressions", action="store_true", help="turn off non-verbal cues (robot.expressions)")
     ap.add_argument("--no-sim", action="store_true", help="do not start a simulator (use a running robot or simulator)")
     ap.add_argument("--keep-sim", action="store_true", help="leave the simulator this script started running")
     args = ap.parse_args()

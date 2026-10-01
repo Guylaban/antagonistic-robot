@@ -54,7 +54,7 @@ class NAOConfig:
 class RobotConfig:
     """Which robot backend to use (robots/)."""
     backend: str = "nao"                # nao | furhat | reachy_mini | text
-    expressions: bool = False           # condition-specific non-verbal cues (Furhat, Reachy Mini)
+    expressions: bool = True            # non-verbal cues that follow the reply's antagonism (Furhat, Reachy Mini)
 
 
 @dataclass

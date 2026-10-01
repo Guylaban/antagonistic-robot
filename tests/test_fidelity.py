@@ -91,6 +91,54 @@ def test_faithful_reply_auto_sent_after_judge(make_manager):
     assert any(e["type"] == "fidelity" and e["source"] == "judge" for e in events)
 
 
+class CueRecorder:
+    """A robot that records the cue it is given (no speech)."""
+    from antagonist_robot.robots.base import Capabilities
+    capabilities = Capabilities(robot="recorder", speech="none", interrupt="verified", expressions=True)
+
+    def __init__(self):
+        self.cues = []
+
+    def connect(self):
+        pass
+
+    def speak(self, text, cue=None):
+        self.cues.append(cue)
+        return True
+
+    def stop(self):
+        return True
+
+    def mic_source(self):
+        return None
+
+    def recognizer(self):
+        return None
+
+    def on_listening(self):
+        pass
+
+    def on_thinking(self):
+        pass
+
+    def on_idle(self):
+        pass
+
+    def close(self):
+        pass
+
+
+def test_robot_cue_carries_what_the_judge_found(make_manager):
+    fid = monitor({"matched_category": "C", "fidelity": 6, "intensity_est": 3, "refused": False})
+    robot = CueRecorder()
+    manager, llm, logger, events = make_manager(["Hello."], ["Oh, brilliant plan."], hold_seconds=0.05, fidelity=fid,
+                                                robot=robot)
+    manager.start_session(2, "D", 2, [], "F9")
+    manager.run_turn()
+    cue = robot.cues[0]
+    assert (cue.category, cue.exhibited_category, cue.exhibited_intensity) == ("D", "C", 3)
+
+
 def test_intensify_raises_polar_for_this_reply_only(make_manager):
     manager, llm, logger, events = make_manager(["You are wrong."], review_mode="manual")
     sid = manager.start_session(1, "D", 1, [], "F3")
