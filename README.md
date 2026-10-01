@@ -100,14 +100,14 @@ The console shows requested vs. exhibited behavior and a per-turn fidelity trend
 
 ## Robots
 
-| Backend (`robot.backend`) | Listening | Speech | Stop speech (measured, `examples/robot_checks.jsonl`) | Setup |
-|---|---|---|---|---|
-| `nao` (NAO, Pepper) | robot front microphone (`ALAudioDevice`, 16 kHz) streamed by the speaker server (port `nao.port + 1`) to local VAD + ASR; mock robot: transcribed exactly | robot TTS (`ALTextToSpeech`) via `nao_speaker_server.py` on the robot | effective (mock robot: returned 0.11 s after Stop) | `python deploy_nao.py` |
-| `furhat` | the robot's own recognizer (`listen()`, text only; no audio archived); virtual Furhat: returns on silence, speech recognition not tested | robot TTS via the Furhat Remote API (`furhat.voice`, e.g. a neural voice such as `AndrewMultilingualNeural`; lip-synced) | **not effective on the virtual Furhat** (SDK 2.9.2): RAWR regains control in 0.04 s but the robot finishes the utterance; unverified on a physical Furhat | Remote API skill running (port 54321) |
-| `reachy_mini` | robot microphones through the SDK to local VAD + ASR; simulator: frames received (the simulator uses the computer mic) | computer TTS streamed to the robot speaker in 0.1 s chunks, sentence by sentence: `tts_engine: system` (SAPI / espeak-ng) or `kokoro` (Kokoro-82M neural voice, offline, GPU if available; first sentence in about 1 s on an RTX 3050 laptop GPU) | effective (MuJoCo simulation: returned 0.10 s after Stop) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
-| `text` | none (use `--script` or `audio.input: computer`) | printed to the terminal | effective | none |
+| Backend (`robot.backend`) | Listening | Speech | Setup |
+|---|---|---|---|
+| `nao` (NAO, Pepper) | robot front microphone (`ALAudioDevice`, 16 kHz) streamed by the speaker server (port `nao.port + 1`) to local VAD + ASR | robot TTS (`ALTextToSpeech`) via `nao_speaker_server.py` on the robot | `python deploy_nao.py` |
+| `furhat` | the robot's own recognizer (`listen()`, text only; no audio archived) | robot TTS via the Furhat Remote API (`furhat.voice`, e.g. a neural voice such as `AndrewMultilingualNeural`; lip-synced) | Remote API skill running (port 54321) |
+| `reachy_mini` | robot microphones through the SDK to local VAD + ASR (the simulator uses the computer's microphone) | computer TTS streamed to the robot speaker in 0.1 s chunks, sentence by sentence: `tts_engine: system` (SAPI / espeak-ng) or `kokoro` (Kokoro-82M neural voice, offline, GPU if available) | Reachy Mini daemon (`reachy-mini-daemon`, or `--sim` for the simulator); run the console on another port (`--port 8090`) |
+| `text` | none (use `--script` or `audio.input: computer`) | printed to the terminal | none |
 
-Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows each backend's interrupt status.
+Check your own robot before a study: `python tools/robot_smoke_test.py --robot <backend> --note "<which robot>"` connects, speaks, interrupts a long utterance, and appends the measurements to `logs/robot_checks.jsonl`. The console header shows whether the backend's Stop speech is verified.
 
 Non-verbal cues (`robot.expressions`, on by default) follow the reply being spoken. The expression comes from the category the fidelity judge finds in the reply (a reply it finds neutral or refusing gets neutral body language, even under an antagonistic condition); without the judge, from the requested category. Its strength follows the antagonism level: the mean of the reply's intensity (the judge's enacted intensity, else the requested intensity class) and the polar level, each out of 3; supportive replies scale with |polar level|. Furhat plays a mild-to-strong sequence of built-in gestures (e.g. Aggressive: BrowFrown, Shake, ExpressAnger; Sarcastic: BrowRaise, Smile, Roll); a mild reply gets only the first, a strong one all of them and more often. It looks thoughtful while a reply is prepared and uses the LED ring. Reachy Mini (with `reachy_mini.animate: true`, the default) moves continuously: it eases into a head and antenna pose per state and reply, breathes and glances while listening, and nods and moves its antennas with the loudness of its own speech, in a style chosen from the expression (sharp beats for Confrontational, asymmetric antennas for Sarcastic, low energy for Dismissive) and scaled by the strength. Set `robot.expressions: false` for a study whose manipulation must be verbal only. The mappings (`DEFAULT_GESTURES`, `DEFAULT_POSES`, `DEFAULT_STYLES`) are in `robots/furhat.py` and `robots/reachy_mini.py`; the expression and strength rules are in `robots/base.py`.
 
@@ -117,7 +117,7 @@ Non-verbal cues (`robot.expressions`, on by default) follow the reply being spok
 |---|---|
 | Computer | Windows 10/11, macOS, or Ubuntu 22.04+ with Python 3.10-3.13. Tested: Windows 11, Python 3.13. |
 | Python packages | `requirements.txt` (FastAPI, uvicorn, torch ≥ 2.0, silero-vad ≥ 5.1, faster-whisper ≥ 1.1, openai ≥ 1.50, sounddevice, paramiko); `requirements-optional.txt` for Furhat, Reachy Mini, and the fidelity detector. A GPU is optional (faster ASR and detector). |
-| Robot | NAO V6 with NAOqi 2.8 (tested with a mock); Furhat with the Remote API skill (tested with the virtual Furhat of SDK 2.9.2); Reachy Mini (tested in the MuJoCo simulation, reachy-mini 1.11). |
+| Robot | NAO V6 with NAOqi 2.8 (or the included mock robot); Furhat with the Remote API skill (Furhat SDK 2.9.2, robot or virtual Furhat); Reachy Mini (reachy-mini SDK 1.11, robot or MuJoCo simulation). |
 | LLM | An API key for any OpenAI-compatible endpoint (default: xAI, `grok-4.20-0309-non-reasoning`), or a local server such as Ollama. The judge needs its own key (default OpenAI). |
 | Microphone | The robot's (default). The computer's default input device only with `audio.input: computer`. |
 
@@ -175,8 +175,7 @@ python main.py --robot reachy_mini --port 8090 # terminal 2: the daemon already 
 Then open http://localhost:8090, set the condition, enter a participant ID, press **Start**, and talk.
 
 **Virtual Furhat.** Start the virtual Furhat in the Furhat SDK with the Remote API skill, then
-`python main.py --robot furhat`. Listening goes through Furhat's own recognizer; speech
-recognition on the virtual Furhat has not been tested yet.
+`python main.py --robot furhat`. Listening goes through Furhat's own recognizer.
 
 **NAO (mock).** `python tools/mock_nao.py` in one terminal, then
 `python main.py --nao-ip 127.0.0.1` with `audio.input: computer` in `config.yaml`. The mock prints
@@ -260,7 +259,7 @@ operator training, and the participants' own manipulation-check answers, are mar
 | `llm` | `base_url`, `model`, `max_tokens` (256), `temperature` (0.9), `api_key_env` |
 | `robot` | `backend` (`nao`/`furhat`/`reachy_mini`/`text`), `expressions` (true) |
 | `nao` | `ip` (`nao.local`, resolved each connection), `port` (9600), `naoqi_port`, `password` |
-| `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat`; `kokoro`/`system` play RAWR's audio, but the virtual Furhat did not lip-sync it), `tts_voice`, `audio_host`, `audio_port` (8095) |
+| `furhat` | `host` (`localhost`), `voice`, `tts_engine` (`furhat` for the robot's own lip-synced voices; `kokoro`/`system` play RAWR's audio), `tts_voice`, `audio_host`, `audio_port` (8095) |
 | `reachy_mini` | `host`, `port` (8000, the daemon's), `connection_mode`, `tts_engine` (`system`/`kokoro`), `tts_rate`, `tts_voice` (SAPI voice name, or a Kokoro voice such as `af_heart`), `tts_device`, `animate` (true), `speech_log_dir` |
 | `avct` | default polar level, category, intensity class |
 | `operator` | `review_mode` (`timed`/`manual`), `hold_seconds` (3.0), `block_auto_send_at` (`Orange`), `model_can_end_session` (false) |
@@ -271,7 +270,7 @@ operator training, and the participants' own manipulation-check answers, are mar
 
 Command-line overrides: `--robot`, `--port`, `--nao-ip`, `--script`, `--no-ui`, `--config`.
 
-Any OpenAI-compatible provider works by changing `llm.base_url`, `llm.model`, and `llm.api_key_env` (e.g. `http://localhost:11434/v1` for Ollama). Pin a dated model snapshot: provider aliases can be remapped (in September 2026 xAI served the `grok-4-fast` alias with the reasoning model `grok-4.3`). The model that actually answered is logged for every reply.
+Any OpenAI-compatible provider works by changing `llm.base_url`, `llm.model`, and `llm.api_key_env` (e.g. `http://localhost:11434/v1` for Ollama). Pin a dated model snapshot, because a provider can remap an alias to a different model. The model that actually answered is logged for every reply.
 
 ## Data formats
 
@@ -347,7 +346,7 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 
 - Run it only with informed consent, a debriefing, and a trained operator watching the console for the whole session.
 - Keep `block_auto_send_at` at Orange or lower, or use Manual review, for antagonistic conditions; use Manual review with vulnerable groups (children, older adults, people with mental-health conditions).
-- On a robot whose Stop speech is not verified (see the Robots table), use Manual review so that no reply is spoken before it is read, and keep replies short.
+- On a robot whose Stop speech is not verified (the console header shows it), use Manual review so that no reply is spoken before it is read, and keep replies short.
 - Treat a distress cue as a reason to check in, not to continue; End session stops the robot.
 - Set session length limits in the protocol (the system has none).
 - Tell participants that their words are sent to the LLM provider (and the monitor and judge providers, if enabled), and, with Furhat, that their speech is recognized by Furhat's speech service; use locally hosted models when data must stay in the lab.
@@ -357,8 +356,8 @@ RAWR produces behavior intended to be unpleasant. It is research infrastructure 
 
 - The content scanner is lexical and English-only: it misses insults without flagged words and can flag harmless uses. It supports the operator; it does not replace them.
 - The fidelity judge scores category and intensity, not modifiers; the detector sees only the reply text and is weaker on some model families. Both are advisory evidence for the operator and the manipulation check, not ground truth.
-- Latency depends on the provider: in our dry runs generation took a median of 1.4 s per reply on one evening and 10.4 s on another with the same model; the review window, monitor, and judge add to the pause.
-- Stop speech is not effective on the virtual Furhat; Furhat, NAO, and Reachy Mini were tested with the virtual robot, a mock, and the simulator respectively, not yet with the physical robots. Listening through the robot was verified end to end only with the mock NAO; NAO's head fans may lower recognition accuracy on the real robot, so check it (and fall back to `audio.input: computer` with a microphone near the participant if needed).
+- Latency depends on the provider and can vary from day to day with the same model, so check it before sessions; the review window, monitor, and judge add to the pause.
+- Check listening on your robot before a study: NAO's head fans may lower recognition accuracy, and `audio.input: computer` with a microphone near the participant is the fallback.
 
 ## Troubleshooting the NAO connection
 

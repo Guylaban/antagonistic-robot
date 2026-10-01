@@ -32,8 +32,7 @@ W, H = 1920, 1080
 CON = (24, 104, 1280, 720)          # x, y, w, h (the 1600x900 console page scaled by 0.8)
 ROB = (1328, 104, 568, 710)
 PAN = (24, 880, 1872, 176)          # caption panel
-# The virtual Furhat's lips trail its own voice: +160 ms in two still-head tests (correlation of mouth
-# opening with loudness, flat between 0 and +160 ms). Showing the face 120 ms earlier leaves about 40 ms.
+# The virtual Furhat's lips trail its own voice slightly; the face is shown this much earlier to align them.
 FURHAT_LIP_LEAD = 0.12
 ROBOT_LABELS = {
     "reachy_mini": ("Robot: Reachy Mini (MuJoCo simulation)", "speech-driven head and antenna motion; robot voice from RAWR"),

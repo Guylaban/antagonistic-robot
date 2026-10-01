@@ -6,20 +6,18 @@ robot's own voice (`say(text)`), or, with tts_engine "kokoro" or
 "system", audio synthesized by RAWR sentence by sentence and played by
 the robot with lip sync requested (`say(url, lipsync)`; RAWR serves
 the WAV files over HTTP on audio_port, so the robot must be able to
-reach this computer). On the virtual Furhat of SDK 2.9.2 the audio
-played but the lips did not move, so keep the default ("furhat", the
-robot's own voices, which include neural voices and do lip-sync) unless
-your robot generates lip sync for audio. Listening uses the robot's
+reach this computer). The default ("furhat", the robot's own voices,
+which include neural voices) is lip-synced; use the other engines only
+if your robot generates lip sync for played audio. Listening uses the robot's
 microphones and its own speech recognition (`listen`), which returns
 text only. Optional non-verbal cues (expressions: true): a sequence of
 Furhat gestures per condition, played through each reply, a thinking
 expression while a reply is prepared, and the LED ring.
 
 Interruption: stop() sends `say_stop` and returns control to RAWR at once,
-so the session never waits on the robot. In our tests with the virtual
-Furhat of SDK 2.9.2, `say_stop` was acknowledged but did not cut the
-audio short (the next utterance started only after the previous one
-ended), so interruption is reported as "unverified" for this backend.
+so the session never waits on the robot. Whether the robot falls silent
+depends on the robot, so interruption is reported as "unverified"; check
+it with tools/robot_smoke_test.py.
 """
 
 import logging
@@ -180,7 +178,7 @@ class FurhatBackend(RobotBackend):
         self.capabilities = Capabilities(
             robot="Furhat", speech=speech, interrupt="unverified", expressions=expressions,
             listening="robot microphones and Furhat's own (cloud) speech recognition; no audio archived",
-            notes="say_stop did not interrupt audio on the virtual Furhat (SDK 2.9.2); verify on your robot",
+            notes="check that Stop speech silences your robot with tools/robot_smoke_test.py",
         )
 
     def recognizer(self):

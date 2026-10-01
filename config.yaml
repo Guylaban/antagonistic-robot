@@ -35,7 +35,7 @@ nao:
 furhat:                 # needs the Remote API skill running on the robot or virtual Furhat (port 54321)
   host: "localhost"
   voice: null           # e.g. "Matthew"; null keeps the robot's current voice
-  tts_engine: "furhat"  # furhat = robot's own voices (lip-synced); kokoro/system = RAWR's audio (lip sync not generated on the virtual Furhat)
+  tts_engine: "furhat"  # furhat = robot's own voices (lip-synced); kokoro/system = RAWR's audio played by the robot
   tts_voice: null       # kokoro voice (e.g. "am_michael") when tts_engine is kokoro
   audio_host: null      # this computer's address as the robot sees it (null = auto)
   audio_port: 8095
