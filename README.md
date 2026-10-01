@@ -329,7 +329,7 @@ tools/robot_smoke_test.py    per-robot connect / speak / Stop check
 tools/simulation/            scripted rehearsal with a simulated robot; optional side-by-side video
 tools/train_fidelity_detector.py      trains the offline detector
 tools/study_report.py        study report (report.md + report.json) from the session database
-examples/                    demo script, demo sessions, robot check records
+examples/                    demo script and demo sessions
 tests/                       offline test suite
 ```
 
